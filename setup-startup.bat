@@ -8,7 +8,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$shell = New-Object -ComObject WScript.Shell; " ^
   "$shortcut = $shell.CreateShortcut('%SHORTCUT%'); " ^
   "$shortcut.TargetPath = '%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe'; " ^
-  "$shortcut.Arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ''%APP_DIR%tray.ps1'''; " ^
+  "$shortcut.Arguments = '-STA -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ''%APP_DIR%tray.ps1'''; " ^
   "$shortcut.WorkingDirectory = '%APP_DIR%'; " ^
   "$shortcut.IconLocation = 'powershell.exe,0'; " ^
   "$shortcut.Save()"

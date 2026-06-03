@@ -2,6 +2,7 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $ErrorActionPreference = "Stop"
+[System.Windows.Forms.Application]::EnableVisualStyles()
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Port = 8765
 $BaseUrl = "http://127.0.0.1:$Port"
@@ -115,6 +116,9 @@ $notifyIcon = New-Object System.Windows.Forms.NotifyIcon
 $notifyIcon.Icon = New-TrayIcon
 $notifyIcon.Text = "AC Control"
 $notifyIcon.Visible = $true
+$notifyIcon.BalloonTipTitle = "AC Control"
+$notifyIcon.BalloonTipText = "AC Control is running in the system tray."
+$notifyIcon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
 
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
 
@@ -154,5 +158,6 @@ $quit.Add_Click({
 
 $notifyIcon.ContextMenuStrip = $menu
 $notifyIcon.Add_DoubleClick({ Start-Process "$BaseUrl/" })
+$notifyIcon.ShowBalloonTip(3000)
 
 [System.Windows.Forms.Application]::Run()
