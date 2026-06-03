@@ -1,0 +1,11 @@
+{
+  "name": "ac-control",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lightweight Windows tray service for Blue Star AC control.",
+  "main": "service.js",
+  "scripts": {
+    "start": "node service.js",
+    "tray": "powershell -ExecutionPolicy Bypass -File .\\tray.ps1"
+  }
+}

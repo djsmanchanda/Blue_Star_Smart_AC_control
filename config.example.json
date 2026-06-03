@@ -1,0 +1,69 @@
+{
+  "host": "127.0.0.1",
+  "port": 8765,
+  "devices": [
+    {
+      "id": "ac",
+      "name": "AC",
+      "type": "thermostat",
+      "provider": "mock",
+      "defaultMode": "COOL",
+      "defaultTemperatureCelsius": 24
+    }
+  ],
+  "providers": {
+    "google-sdm": {
+      "projectId": "YOUR_DEVICE_ACCESS_PROJECT_ID",
+      "deviceId": "YOUR_NEST_THERMOSTAT_DEVICE_ID",
+      "accessTokenEnv": "GOOGLE_SDM_ACCESS_TOKEN",
+      "refreshTokenEnv": "GOOGLE_SDM_REFRESH_TOKEN",
+      "clientIdEnv": "GOOGLE_SDM_CLIENT_ID",
+      "clientSecretEnv": "GOOGLE_SDM_CLIENT_SECRET"
+    },
+    "bluestar-local": {
+      "host": "192.168.1.50",
+      "notes": "Run LAN discovery first. Add commandUrls only after confirming the AC exposes a local API."
+    },
+    "bluestar-cloud": {
+      "endpoint": "a26381dl7mudo4-ats.iot.ap-south-1.amazonaws.com",
+      "region": "ap-south-1",
+      "signingService": "iotdata",
+      "fallbackSigningService": "iotdevicegateway",
+      "transport": "mqtt-websocket",
+      "webSocketPort": 443,
+      "thingId": "YOUR_BLUESTAR_THING_ID",
+      "controlTopic": "$aws/things/${THING_ID}/shadow/update",
+      "qos": 0,
+      "wrapShadow": true,
+      "addTimestamp": true,
+      "source": "anmq",
+      "notes": "AWS credentials must be provided through BLUESTAR_AWS_ACCESS_KEY_ID, BLUESTAR_AWS_SECRET_ACCESS_KEY, and usually BLUESTAR_AWS_SESSION_TOKEN. The APK shows normal controls publish desired shadow state with src=anmq.",
+      "commandPayloads": {
+        "turnOn": {
+          "pow": 1
+        },
+        "turnOff": {
+          "pow": 0
+        },
+        "setTemperature": {
+          "stemp": "${VALUE_FIXED1}"
+        },
+        "setFanSpeed": {
+          "fspd": "${VALUE_NUMBER}"
+        },
+        "setMode": {
+          "mode": "${VALUE_NUMBER}"
+        },
+        "setDisplay": {
+          "display": "${VALUE_NUMBER}"
+        },
+        "setHorizontalSwing": {
+          "hswing": "${VALUE_NUMBER}"
+        },
+        "setVerticalSwing": {
+          "vswing": "${VALUE_NUMBER}"
+        }
+      }
+    }
+  }
+}
