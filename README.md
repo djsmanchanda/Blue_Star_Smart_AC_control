@@ -31,12 +31,19 @@ Start the tray app:
 powershell -ExecutionPolicy Bypass -File .\tray.ps1
 ```
 
+Install tray startup after Windows sign-in:
+
+```powershell
+.\setup-startup.bat
+```
+
 The tray menu provides:
 
 - Open control panel
 - AC on/off
 - Increase temperature by 1 C
 - Decrease temperature by 1 C
+- Toggle display
 - Reload config
 - Quit
 
@@ -52,6 +59,8 @@ The web panel includes:
 - AC mode: fan, heat, cool, dry, auto
 - horizontal swing
 - vertical swing levels
+
+The web panel does not poll in the background. It reads MQTT status on page load, when you press Refresh, and once after each command.
 
 ## Blue Star Protocol
 

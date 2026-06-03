@@ -85,6 +85,16 @@ function Change-ACTemperature($delta) {
   Send-DeviceCommand "ac" "setTemperature" ($temperature + $delta)
 }
 
+function Toggle-ACDisplay {
+  $response = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/devices/ac/status" -TimeoutSec 20
+  $display = $response.status.state.display
+  if ($display -eq 1) {
+    Send-DeviceCommand "ac" "setDisplay" 0
+  } else {
+    Send-DeviceCommand "ac" "setDisplay" 1
+  }
+}
+
 function New-TrayIcon {
   $bitmap = New-Object System.Drawing.Bitmap 32, 32
   $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
@@ -124,6 +134,9 @@ $tempUp.Add_Click({ Change-ACTemperature 1 })
 
 $tempDown = $menu.Items.Add("Decrease temp by 1 C")
 $tempDown.Add_Click({ Change-ACTemperature -1 })
+
+$displayToggle = $menu.Items.Add("Toggle display")
+$displayToggle.Add_Click({ Toggle-ACDisplay })
 
 $menu.Items.Add("-") | Out-Null
 

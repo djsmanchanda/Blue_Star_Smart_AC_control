@@ -69,6 +69,8 @@ async function sendCommand(command, value) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+  updateLocalStatus(command, value);
+  renderControls();
   setStatus(`${commandLabels[command] || command} sent`, "ok");
   await loadStatus();
 }
@@ -137,6 +139,39 @@ function renderStatus() {
   raw.className = "raw-state";
   raw.textContent = JSON.stringify(state, null, 2);
   return [grid, raw];
+}
+
+function updateLocalStatus(command, value) {
+  if (!currentStatus) {
+    return;
+  }
+  const state = currentStatus.state || {};
+  const summary = currentStatus.summary || {};
+  if (command === "turnOn") {
+    state.pow = 1;
+    summary.power = "On";
+  } else if (command === "turnOff") {
+    state.pow = 0;
+    summary.power = "Off";
+  } else if (command === "setTemperature") {
+    state.stemp = Number(value).toFixed(1);
+    summary.temperatureCelsius = state.stemp;
+  } else if (command === "setDisplay") {
+    state.display = Number(value);
+    summary.display = Number(value) === 1 ? "On" : "Off";
+  } else if (command === "setFanSpeed") {
+    state.fspd = Number(value);
+    summary.fanSpeed = Object.fromEntries(fanSpeeds.map(([label, item]) => [item, label]))[Number(value)] || value;
+  } else if (command === "setMode") {
+    state.mode = Number(value);
+    summary.mode = Object.fromEntries(acModes.map(([label, item]) => [item, label]))[Number(value)] || value;
+  } else if (command === "setHorizontalSwing") {
+    state.hswing = Number(value);
+    summary.horizontalSwing = Object.fromEntries(swingLevels.map(([label, item]) => [item, label]))[Number(value)] || value;
+  } else if (command === "setVerticalSwing") {
+    state.vswing = Number(value);
+    summary.verticalSwing = Object.fromEntries(swingLevels.map(([label, item]) => [item, label]))[Number(value)] || value;
+  }
 }
 
 function renderControls() {
