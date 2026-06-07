@@ -96,6 +96,32 @@ function Toggle-ACDisplay {
   }
 }
 
+function Get-ACState {
+  try {
+    $response = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/devices/ac/status" -TimeoutSec 20
+    return $response.status.state
+  } catch {
+    return $null
+  }
+}
+
+function Set-CapacityProfile($eco, $esave = 0, $turbo = 0, $fanSpeed = $null, $temperature = $null) {
+  $value = @{
+    eco = $eco
+    esave = $esave
+    turbo = $turbo
+  }
+  if ($null -ne $fanSpeed) {
+    $value.fspd = $fanSpeed
+  }
+  if ($null -ne $temperature) {
+    $value.stemp = $temperature
+  }
+  Send-DeviceCommand "ac" "setCapacityProfile" $value
+}
+
+# --- Tray icon ---
+
 function New-TrayIcon {
   $bitmap = New-Object System.Drawing.Bitmap 32, 32
   $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
@@ -110,7 +136,44 @@ function New-TrayIcon {
   return [System.Drawing.Icon]::FromHandle($iconHandle)
 }
 
+# --- DWM helper ---
+
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class DwmTrayMenu {
+  [DllImport("dwmapi.dll")]
+  private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+  public static void ApplyDarkRounded(IntPtr hwnd) {
+    int dark = 1;
+    DwmSetWindowAttribute(hwnd, 20, ref dark, sizeof(int));
+    int round = 2;
+    DwmSetWindowAttribute(hwnd, 33, ref round, sizeof(int));
+  }
+}
+"@
+
+# --- Theme colours ---
+
+$ColWidth   = 140
+$BtnHeight  = 30
+$MenuBack   = [System.Drawing.Color]::FromArgb(43, 43, 43)
+$MenuHover  = [System.Drawing.Color]::FromArgb(61, 61, 61)
+$MenuPress  = [System.Drawing.Color]::FromArgb(53, 53, 53)
+$MenuFore   = [System.Drawing.Color]::FromArgb(251, 251, 251)
+$MenuMuted  = [System.Drawing.Color]::FromArgb(154, 154, 154)
+$ActiveBack = [System.Drawing.Color]::FromArgb(14, 50, 34)
+$ActiveFore = [System.Drawing.Color]::FromArgb(96, 210, 130)
+$SepColor   = [System.Drawing.Color]::FromArgb(56, 56, 56)
+$Deg        = [char]0x00B0   # ° (degree sign, avoids encoding issues)
+
+# --- Start service ---
+
 $serviceProcess = Start-ServiceIfNeeded
+
+# --- NotifyIcon ---
 
 $notifyIcon = New-Object System.Windows.Forms.NotifyIcon
 $notifyIcon.Icon = New-TrayIcon
@@ -120,43 +183,221 @@ $notifyIcon.BalloonTipTitle = "AC Control"
 $notifyIcon.BalloonTipText = "AC Control is running in the system tray."
 $notifyIcon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
 
-$menu = New-Object System.Windows.Forms.ContextMenuStrip
+# --- Popup form ---
 
-$openItem = $menu.Items.Add("Open control panel")
-$openItem.Add_Click({ Start-Process "$BaseUrl/" })
+$PanelW = $ColWidth + 4           # button + margin
+$Gap    = 8
+$FormW  = 8 + $PanelW + $Gap + $PanelW + 8
 
-$menu.Items.Add("-") | Out-Null
+$script:TrayPopup = New-Object System.Windows.Forms.Form
+$script:TrayPopup.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
+$script:TrayPopup.ShowInTaskbar = $false
+$script:TrayPopup.TopMost = $true
+$script:TrayPopup.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
+$script:TrayPopup.BackColor = $MenuBack
+$script:TrayPopup.Width = $FormW
+$script:TrayPopup.Padding = New-Object System.Windows.Forms.Padding 8
+$script:TrayPopup.Add_Shown({ [DwmTrayMenu]::ApplyDarkRounded($script:TrayPopup.Handle) })
 
-$acOn = $menu.Items.Add("AC on")
-$acOn.Add_Click({ Send-DeviceCommand "ac" "turnOn" })
+# --- Two column panels ---
 
-$acOff = $menu.Items.Add("AC off")
-$acOff.Add_Click({ Send-DeviceCommand "ac" "turnOff" })
+$leftPanel = New-Object System.Windows.Forms.FlowLayoutPanel
+$leftPanel.Location = New-Object System.Drawing.Point 8, 8
+$leftPanel.Width = $PanelW
+$leftPanel.AutoSize = $true
+$leftPanel.FlowDirection = [System.Windows.Forms.FlowDirection]::TopDown
+$leftPanel.WrapContents = $false
+$leftPanel.BackColor = $MenuBack
+$script:TrayPopup.Controls.Add($leftPanel)
 
-$tempUp = $menu.Items.Add("Increase temp by 1 C")
-$tempUp.Add_Click({ Change-ACTemperature 1 })
+$rightPanel = New-Object System.Windows.Forms.FlowLayoutPanel
+$rightPanel.Location = New-Object System.Drawing.Point (8 + $PanelW + $Gap), 8
+$rightPanel.Width = $PanelW
+$rightPanel.AutoSize = $true
+$rightPanel.FlowDirection = [System.Windows.Forms.FlowDirection]::TopDown
+$rightPanel.WrapContents = $false
+$rightPanel.BackColor = $MenuBack
+$script:TrayPopup.Controls.Add($rightPanel)
 
-$tempDown = $menu.Items.Add("Decrease temp by 1 C")
-$tempDown.Add_Click({ Change-ACTemperature -1 })
+# --- UI helpers ---
 
-$displayToggle = $menu.Items.Add("Toggle display")
-$displayToggle.Add_Click({ Toggle-ACDisplay })
+function New-PopupButton($text, $onClick) {
+  $button = New-Object System.Windows.Forms.Button
+  $button.Text = $text
+  $button.Width = $ColWidth
+  $button.Height = $BtnHeight
+  $button.Margin = New-Object System.Windows.Forms.Padding 2, 1, 2, 1
+  $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+  $button.FlatAppearance.BorderSize = 0
+  $button.FlatAppearance.MouseOverBackColor = $MenuHover
+  $button.FlatAppearance.MouseDownBackColor = $MenuPress
+  $button.BackColor = $MenuBack
+  $button.ForeColor = $MenuFore
+  $button.Font = New-Object System.Drawing.Font "Segoe UI", 9, ([System.Drawing.FontStyle]::Regular)
+  $button.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+  $button.Padding = New-Object System.Windows.Forms.Padding 6, 0, 4, 0
+  $button.Tag = $text
+  $button.Add_Click({
+    $script:TrayPopup.Hide()
+    & $onClick
+  })
+  return $button
+}
 
-$menu.Items.Add("-") | Out-Null
+function Add-PopupHeader($panel, $text) {
+  $label = New-Object System.Windows.Forms.Label
+  $label.Text = $text
+  $label.AutoSize = $false
+  $label.Width = $ColWidth
+  $label.Height = 18
+  $label.Margin = New-Object System.Windows.Forms.Padding 2, 8, 2, 2
+  $label.ForeColor = $MenuMuted
+  $label.Font = New-Object System.Drawing.Font "Segoe UI", 8, ([System.Drawing.FontStyle]::Regular)
+  $label.Padding = New-Object System.Windows.Forms.Padding 6, 0, 0, 0
+  $panel.Controls.Add($label)
+}
 
-$reload = $menu.Items.Add("Reload config")
-$reload.Add_Click({ Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/reload" -TimeoutSec 5 | Out-Null })
+function Add-PopupSeparator($panel) {
+  $sep = New-Object System.Windows.Forms.Panel
+  $sep.Height = 1
+  $sep.Width = ($ColWidth - 16)
+  $sep.BackColor = $SepColor
+  $sep.Margin = New-Object System.Windows.Forms.Padding 10, 6, 10, 6
+  $panel.Controls.Add($sep)
+}
 
-$quit = $menu.Items.Add("Quit")
-$quit.Add_Click({
+function Set-PopupButtonState($button, $isActive) {
+  $label = [string]$button.Tag
+  if ($isActive) {
+    $button.Text = "$([char]0x25CF)  $label"
+    $button.BackColor = $ActiveBack
+    $button.ForeColor = $ActiveFore
+  } else {
+    $button.Text = "   $label"
+    $button.BackColor = $MenuBack
+    $button.ForeColor = $MenuFore
+  }
+}
+
+# =============================================
+#  LEFT COLUMN: Open  |  Power  |  Fan
+# =============================================
+
+$openButton = New-PopupButton "Open panel" { Start-Process "$BaseUrl/" }
+$leftPanel.Controls.Add($openButton)
+
+Add-PopupSeparator $leftPanel
+
+Add-PopupHeader $leftPanel "POWER"
+$powerOnButton   = New-PopupButton "On"          { Send-DeviceCommand "ac" "turnOn" }
+$powerOffButton  = New-PopupButton "Off"         { Send-DeviceCommand "ac" "turnOff" }
+$displayOnButton  = New-PopupButton "Display on"  { Send-DeviceCommand "ac" "setDisplay" 1 }
+$displayOffButton = New-PopupButton "Display off" { Send-DeviceCommand "ac" "setDisplay" 0 }
+$leftPanel.Controls.AddRange(@($powerOnButton, $powerOffButton, $displayOnButton, $displayOffButton))
+
+Add-PopupSeparator $leftPanel
+
+Add-PopupHeader $leftPanel "FAN"
+$fanLowButton    = New-PopupButton "Low"    { Send-DeviceCommand "ac" "setFanSpeed" 2 }
+$fanMediumButton = New-PopupButton "Medium" { Send-DeviceCommand "ac" "setFanSpeed" 3 }
+$fanHighButton   = New-PopupButton "High"   { Send-DeviceCommand "ac" "setFanSpeed" 4 }
+$fanTurboButton  = New-PopupButton "Turbo"  { Send-DeviceCommand "ac" "setFanSpeed" 6 }
+$fanAutoButton   = New-PopupButton "Auto"   { Send-DeviceCommand "ac" "setFanSpeed" 7 }
+$leftPanel.Controls.AddRange(@($fanLowButton, $fanMediumButton, $fanHighButton, $fanTurboButton, $fanAutoButton))
+
+# =============================================
+#  RIGHT COLUMN: Temperature  |  Profile  |  System
+# =============================================
+
+Add-PopupHeader $rightPanel "TEMPERATURE"
+$rightPanel.Controls.AddRange(@(
+  (New-PopupButton "Temp +1 ${Deg}C" { Change-ACTemperature 1 }),
+  (New-PopupButton "Temp -1 ${Deg}C" { Change-ACTemperature -1 })
+))
+
+Add-PopupSeparator $rightPanel
+
+Add-PopupHeader $rightPanel "PROFILE"
+$profileDefaultButton = New-PopupButton "Default" { Set-CapacityProfile 0 0 0 }
+$profile100Button     = New-PopupButton "100%"    { Set-CapacityProfile 1 0 0 }
+$profile80Button      = New-PopupButton "80%"     { Set-CapacityProfile 2 0 0 }
+$profile60Button      = New-PopupButton "60%"     { Set-CapacityProfile 3 0 0 }
+$profile40Button      = New-PopupButton "40%"     { Set-CapacityProfile 4 0 0 }
+$profileEcoButton     = New-PopupButton "Eco"     { Set-CapacityProfile 0 1 0 }
+$profileTurboButton   = New-PopupButton "Turbo"   { Set-CapacityProfile 0 0 3 6 "16.0" }
+$rightPanel.Controls.AddRange(@($profileDefaultButton, $profile100Button, $profile80Button, $profile60Button, $profile40Button, $profileEcoButton, $profileTurboButton))
+
+Add-PopupSeparator $rightPanel
+
+$reloadButton = New-PopupButton "Reload" { Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/reload" -TimeoutSec 5 | Out-Null }
+$quitButton = New-PopupButton "Quit" {
   $notifyIcon.Visible = $false
   if ($serviceProcess -and -not $serviceProcess.HasExited) {
     $serviceProcess.Kill()
   }
   [System.Windows.Forms.Application]::Exit()
-})
+}
+$rightPanel.Controls.AddRange(@($reloadButton, $quitButton))
 
-$notifyIcon.ContextMenuStrip = $menu
+# --- Calculate form height from taller column ---
+
+$leftH = 0
+foreach ($c in $leftPanel.Controls) { $leftH += $c.Height + $c.Margin.Top + $c.Margin.Bottom }
+$rightH = 0
+foreach ($c in $rightPanel.Controls) { $rightH += $c.Height + $c.Margin.Top + $c.Margin.Bottom }
+$script:TrayPopup.Height = [Math]::Max($leftH, $rightH) + 16
+
+# --- State refresh ---
+
+function Refresh-PopupVisualState {
+  $state = Get-ACState
+  if ($null -eq $state) {
+    return
+  }
+  Set-PopupButtonState $powerOnButton ($state.pow -eq 1)
+  Set-PopupButtonState $powerOffButton ($state.pow -eq 0)
+  Set-PopupButtonState $displayOnButton ($state.display -eq 1)
+  Set-PopupButtonState $displayOffButton ($state.display -eq 0)
+  Set-PopupButtonState $fanLowButton ($state.fspd -eq 2)
+  Set-PopupButtonState $fanMediumButton ($state.fspd -eq 3)
+  Set-PopupButtonState $fanHighButton ($state.fspd -eq 4)
+  Set-PopupButtonState $fanTurboButton ($state.fspd -eq 6)
+  Set-PopupButtonState $fanAutoButton ($state.fspd -eq 7)
+  Set-PopupButtonState $profileTurboButton ($state.turbo -eq 3)
+  Set-PopupButtonState $profileEcoButton (($state.turbo -ne 3) -and ($state.esave -eq 1))
+  Set-PopupButtonState $profileDefaultButton (($state.turbo -ne 3) -and ($state.esave -ne 1) -and ($state.eco -eq 0))
+  Set-PopupButtonState $profile100Button (($state.turbo -ne 3) -and ($state.esave -ne 1) -and ($state.eco -eq 1))
+  Set-PopupButtonState $profile80Button (($state.turbo -ne 3) -and ($state.esave -ne 1) -and ($state.eco -eq 2))
+  Set-PopupButtonState $profile60Button (($state.turbo -ne 3) -and ($state.esave -ne 1) -and ($state.eco -eq 3))
+  Set-PopupButtonState $profile40Button (($state.turbo -ne 3) -and ($state.esave -ne 1) -and ($state.eco -eq 4))
+}
+
+$script:TrayPopup.Add_Deactivate({ $script:TrayPopup.Hide() })
+
+$stateTimer = New-Object System.Windows.Forms.Timer
+$stateTimer.Interval = 45000
+$stateTimer.Add_Tick({ Refresh-PopupVisualState })
+$stateTimer.Start()
+
+# --- Show popup near tray ---
+
+function Show-TrayPopup {
+  Refresh-PopupVisualState
+  $point = [System.Windows.Forms.Cursor]::Position
+  $screen = [System.Windows.Forms.Screen]::FromPoint($point).WorkingArea
+  $x = [Math]::Min($point.X, $screen.Right - $script:TrayPopup.Width - 8)
+  $y = [Math]::Min($point.Y, $screen.Bottom - $script:TrayPopup.Height - 8)
+  $script:TrayPopup.Location = New-Object System.Drawing.Point ([Math]::Max($screen.Left + 8, $x)), ([Math]::Max($screen.Top + 8, $y))
+  $script:TrayPopup.Show()
+  $script:TrayPopup.Activate()
+}
+
+$notifyIcon.Add_MouseUp({
+  param($sender, $eventArgs)
+  if ($eventArgs.Button -eq [System.Windows.Forms.MouseButtons]::Right) {
+    Show-TrayPopup
+  }
+})
 $notifyIcon.Add_DoubleClick({ Start-Process "$BaseUrl/" })
 $notifyIcon.ShowBalloonTip(3000)
 

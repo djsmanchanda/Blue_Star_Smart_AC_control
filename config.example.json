@@ -62,7 +62,8 @@
         },
         "setVerticalSwing": {
           "vswing": "${VALUE_NUMBER}"
-        }
+        },
+        "setCapacityProfile": "${VALUE_OBJECT}"
       }
     }
   }

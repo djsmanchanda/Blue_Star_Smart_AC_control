@@ -1,15 +1,19 @@
 :root {
-  color-scheme: light;
+  color-scheme: dark;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --bg: #f5f7f8;
-  --panel: #ffffff;
-  --ink: #151b1f;
-  --muted: #5d6670;
-  --line: #d9e0e6;
-  --green: #20865a;
-  --red: #b43d3d;
-  --blue: #245fa8;
-  --shadow: 0 14px 38px rgba(16, 28, 38, 0.1);
+  --bg: #0f1419;
+  --panel: #171d24;
+  --panel-raised: #1d252e;
+  --ink: #e7edf3;
+  --muted: #9aa8b6;
+  --line: #2e3945;
+  --green: #42d487;
+  --green-bg: #123924;
+  --red: #ff7474;
+  --red-bg: #432022;
+  --blue: #78aefc;
+  --blue-bg: #1b3354;
+  --shadow: 0 14px 38px rgba(0, 0, 0, 0.28);
 }
 
 * {
@@ -19,7 +23,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: #f5f7f8;
+  background: var(--bg);
   color: var(--ink);
 }
 
@@ -75,13 +79,18 @@ input {
 }
 
 button {
-  border: 0;
+  border: 1px solid var(--line);
   min-height: 40px;
   padding: 0 13px;
-  background: #e9eef2;
+  background: var(--panel-raised);
   color: var(--ink);
   cursor: pointer;
   font-weight: 720;
+}
+
+button:hover:not(:disabled) {
+  border-color: #4b5b6b;
+  background: #242d37;
 }
 
 button:disabled {
@@ -91,7 +100,7 @@ button:disabled {
 
 button:focus-visible,
 input:focus-visible {
-  outline: 3px solid rgba(36, 95, 168, 0.32);
+  outline: 3px solid rgba(120, 174, 252, 0.34);
   outline-offset: 2px;
 }
 
@@ -121,7 +130,7 @@ input:focus-visible {
   flex: 0 0 auto;
   border-radius: 50%;
   background: var(--blue);
-  box-shadow: 0 0 0 5px rgba(36, 95, 168, 0.12);
+  box-shadow: 0 0 0 5px rgba(120, 174, 252, 0.15);
 }
 
 #service-status[data-tone="ok"] {
@@ -149,12 +158,20 @@ input:focus-visible {
 }
 
 .command.primary {
-  background: #dff3e9;
+  background: var(--blue-bg);
+  border-color: #2a5b91;
+  color: #cfe3ff;
+}
+
+.command.active {
+  background: var(--green-bg);
+  border-color: #2e9f63;
   color: var(--green);
 }
 
 .command.danger {
-  background: #f6e5e5;
+  background: var(--red-bg);
+  border-color: #7a3438;
   color: var(--red);
 }
 
@@ -163,6 +180,8 @@ input {
   border: 1px solid var(--line);
   min-height: 40px;
   padding: 8px 10px;
+  background: #11171d;
+  color: var(--ink);
 }
 
 .status-grid {
@@ -196,7 +215,7 @@ input {
   padding: 14px;
   max-height: 220px;
   overflow: auto;
-  color: #2e3a44;
+  color: #c6d1dc;
 }
 
 @media (max-width: 760px) {

@@ -18,14 +18,29 @@ const acModes = [
   ["Auto", 4],
 ];
 
-const swingLevels = [
-  ["Off", 0],
-  ["On", 1],
-  ["Level 1", 2],
-  ["Level 2", 3],
-  ["Level 3", 4],
-  ["Level 4", 5],
-  ["Auto", 6],
+const horizontalSwingOptions = [
+  ["On", 0],
+  ["Off", 6],
+];
+
+const verticalSwingOptions = [
+  ["Swing", 0],
+  ["1", 1],
+  ["2", 2],
+  ["3", 3],
+  ["4", 4],
+  ["5", 5],
+  ["Off", 6],
+];
+
+const capacityProfileOptions = [
+  ["Default", { eco: 0, esave: 0, turbo: 0 }],
+  ["100%", { eco: 1, esave: 0, turbo: 0 }],
+  ["80%", { eco: 2, esave: 0, turbo: 0 }],
+  ["60%", { eco: 3, esave: 0, turbo: 0 }],
+  ["40%", { eco: 4, esave: 0, turbo: 0 }],
+  ["Eco", { esave: 1, eco: 0, turbo: 0 }],
+  ["Turbo", { turbo: 3, eco: 0, esave: 0, fspd: 6, stemp: "16.0" }],
 ];
 
 const commandLabels = {
@@ -37,6 +52,7 @@ const commandLabels = {
   setDisplay: "Display",
   setHorizontalSwing: "Horizontal swing",
   setVerticalSwing: "Vertical swing",
+  setCapacityProfile: "Capacity profile",
 };
 
 let acDevice;
@@ -93,6 +109,10 @@ function button(label, onClick, className = "") {
   return element;
 }
 
+function activeClass(isActive) {
+  return isActive ? "active" : "";
+}
+
 function controlGroup(title, controls) {
   const section = document.createElement("section");
   section.className = "control-group";
@@ -105,8 +125,34 @@ function controlGroup(title, controls) {
   return section;
 }
 
-function optionButtons(options, command) {
-  return options.map(([label, value]) => button(label, () => sendCommand(command, value)));
+function optionButtons(options, command, activeValue) {
+  return options.map(([label, value]) => {
+    const isActive = activeValue !== undefined && Number(activeValue) === Number(value);
+    return button(label, () => sendCommand(command, value), activeClass(isActive));
+  });
+}
+
+function capacityProfileName(state = {}) {
+  if (state.turbo === 3) {
+    return "Turbo";
+  }
+  if (state.esave === 1) {
+    return "Eco";
+  }
+  return Object.fromEntries([
+    [0, "Default"],
+    [1, "100%"],
+    [2, "80%"],
+    [3, "60%"],
+    [4, "40%"],
+  ])[Number(state.eco)] || "Default";
+}
+
+function capacityButtons() {
+  const currentProfile = capacityProfileName(currentStatus?.state || {});
+  return capacityProfileOptions.map(([label, value]) => (
+    button(label, () => sendCommand("setCapacityProfile", value), activeClass(label === currentProfile))
+  ));
 }
 
 function renderStatus() {
@@ -118,6 +164,7 @@ function renderStatus() {
     ["Room temp", summary.ambientTemperatureCelsius ? `${summary.ambientTemperatureCelsius} C` : "Unknown"],
     ["Mode", summary.mode],
     ["Fan", summary.fanSpeed],
+    ["Profile", summary.capacityProfile],
     ["Display", summary.display],
     ["H swing", summary.horizontalSwing],
     ["V swing", summary.verticalSwing],
@@ -167,10 +214,27 @@ function updateLocalStatus(command, value) {
     summary.mode = Object.fromEntries(acModes.map(([label, item]) => [item, label]))[Number(value)] || value;
   } else if (command === "setHorizontalSwing") {
     state.hswing = Number(value);
-    summary.horizontalSwing = Object.fromEntries(swingLevels.map(([label, item]) => [item, label]))[Number(value)] || value;
+    summary.horizontalSwing = Object.fromEntries(horizontalSwingOptions.map(([label, item]) => [item, label]))[Number(value)] || value;
   } else if (command === "setVerticalSwing") {
     state.vswing = Number(value);
-    summary.verticalSwing = Object.fromEntries(swingLevels.map(([label, item]) => [item, label]))[Number(value)] || value;
+    summary.verticalSwing = Object.fromEntries(verticalSwingOptions.map(([label, item]) => [item, label]))[Number(value)] || value;
+  } else if (command === "setCapacityProfile") {
+    Object.assign(state, value);
+    if (value.turbo === 3) {
+      summary.capacityProfile = "Turbo";
+      summary.fanSpeed = "Turbo";
+      summary.temperatureCelsius = "16.0";
+    } else if (value.esave === 1) {
+      summary.capacityProfile = "Eco";
+    } else {
+      summary.capacityProfile = Object.fromEntries([
+        [0, "Default"],
+        [1, "100%"],
+        [2, "80%"],
+        [3, "60%"],
+        [4, "40%"],
+      ])[Number(value.eco)] || value.eco;
+    }
   }
 }
 
@@ -182,12 +246,13 @@ function renderControls() {
   temperature.step = "1";
   temperature.value = Number.parseFloat(currentStatus?.state?.stemp) || acDevice.defaultTemperatureCelsius || 24;
   temperature.setAttribute("aria-label", "AC temperature");
+  const state = currentStatus?.state || {};
 
   acPanel.replaceChildren(
     controlGroup("Status", [
       button("Refresh", loadStatus, "primary"),
-      button("On", () => sendCommand("turnOn"), "primary"),
-      button("Off", () => sendCommand("turnOff"), "danger"),
+      button("On", () => sendCommand("turnOn"), activeClass(state.pow === 1)),
+      button("Off", () => sendCommand("turnOff"), activeClass(state.pow === 0)),
     ]),
     ...renderStatus(),
     controlGroup("Temperature", [
@@ -197,13 +262,14 @@ function renderControls() {
       button("Set", () => sendCommand("setTemperature", Number(temperature.value)), "primary"),
     ]),
     controlGroup("Display", [
-      button("Display on", () => sendCommand("setDisplay", 1), "primary"),
-      button("Display off", () => sendCommand("setDisplay", 0)),
+      button("Display on", () => sendCommand("setDisplay", 1), activeClass(state.display === 1)),
+      button("Display off", () => sendCommand("setDisplay", 0), activeClass(state.display === 0)),
     ]),
-    controlGroup("Fan Speed", optionButtons(fanSpeeds, "setFanSpeed")),
-    controlGroup("AC Mode", optionButtons(acModes, "setMode")),
-    controlGroup("Horizontal Swing", optionButtons(swingLevels, "setHorizontalSwing")),
-    controlGroup("Vertical Swing", optionButtons(swingLevels, "setVerticalSwing")),
+    controlGroup("Capacity", capacityButtons()),
+    controlGroup("Fan Speed", optionButtons(fanSpeeds, "setFanSpeed", state.fspd)),
+    controlGroup("AC Mode", optionButtons(acModes, "setMode", state.mode)),
+    controlGroup("Horizontal Swing", optionButtons(horizontalSwingOptions, "setHorizontalSwing", state.hswing)),
+    controlGroup("Vertical Swing", optionButtons(verticalSwingOptions, "setVerticalSwing", state.vswing)),
   );
 }
 

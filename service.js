@@ -242,6 +242,12 @@ function interpolate(value, context) {
 }
 
 function interpolateObject(value, context) {
+  if (value === "${VALUE_OBJECT}") {
+    if (!context.value || typeof context.value !== "object" || Array.isArray(context.value)) {
+      throw new Error("Command value must be an object.");
+    }
+    return context.value;
+  }
   if (value === "${VALUE_NUMBER}") {
     const numberValue = Number(context.value);
     if (!Number.isFinite(numberValue)) {
@@ -1139,8 +1145,15 @@ function normalizeBlueStarStatus(raw) {
   const labels = {
     fanSpeed: { 2: "Low", 3: "Medium", 4: "High", 6: "Turbo", 7: "Auto" },
     mode: { 0: "Fan", 1: "Heat", 2: "Cool", 3: "Dry", 4: "Auto" },
-    swing: { 0: "Off", 1: "On", 2: "Level 1", 3: "Level 2", 4: "Level 3", 5: "Level 4", 6: "Auto" },
+    horizontalSwing: { 0: "On", 6: "Off" },
+    verticalSwing: { 0: "Swing", 1: "Height 1", 2: "Height 2", 3: "Height 3", 4: "Height 4", 5: "Height 5", 6: "Off" },
+    capacityProfile: { 0: "Default", 1: "100%", 2: "80%", 3: "60%", 4: "40%" },
   };
+  const capacityProfile = state.turbo === 3
+    ? "Turbo"
+    : state.esave === 1
+      ? "Eco"
+      : labels.capacityProfile[state.eco] || (state.eco ?? "Unknown");
   return {
     raw,
     state,
@@ -1151,8 +1164,9 @@ function normalizeBlueStarStatus(raw) {
       ambientTemperatureCelsius: state.ctemp ?? null,
       fanSpeed: labels.fanSpeed[state.fspd] || (state.fspd ?? "Unknown"),
       mode: labels.mode[state.mode] || (state.mode ?? "Unknown"),
-      horizontalSwing: labels.swing[state.hswing] || (state.hswing ?? "Unknown"),
-      verticalSwing: labels.swing[state.vswing] || (state.vswing ?? "Unknown"),
+      capacityProfile,
+      horizontalSwing: labels.horizontalSwing[state.hswing] || (state.hswing ?? "Unknown"),
+      verticalSwing: labels.verticalSwing[state.vswing] || (state.vswing ?? "Unknown"),
     },
   };
 }

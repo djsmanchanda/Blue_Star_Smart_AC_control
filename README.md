@@ -57,8 +57,9 @@ The web panel includes:
 - display on/off
 - fan speed: low, medium, high, turbo, auto
 - AC mode: fan, heat, cool, dry, auto
-- horizontal swing
-- vertical swing levels
+- capacity profile: default, 100%, 80%, 60%, 40%, eco, turbo
+- horizontal swing on/off
+- vertical swing sweep and fixed heights
 
 The web panel does not poll in the background. It reads MQTT status on page load, when you press Refresh, and once after each command.
 
@@ -96,8 +97,11 @@ Current status is read by subscribing to `things/<thing-id>/state/reported` and 
 - current room temperature: `ctemp`
 - mode: `mode` (`0` fan, `1` heat, `2` cool, `3` dry, `4` auto)
 - fan speed: `fspd` (`2` low, `3` medium, `4` high, `6` turbo, `7` auto)
-- horizontal swing: `hswing`
-- vertical swing: `vswing`
+- capacity profile: `eco` (`0` default, `1` 100%, `2` 80%, `3` 60%, `4` 40%)
+- eco preset: `esave` (`1` on)
+- turbo preset: `turbo` (`3` on), also sets `fspd` to `6` and `stemp` to `"16.0"`
+- horizontal swing: `hswing` (`0` on, `6` off)
+- vertical swing: `vswing` (`0` sweep, `1`-`5` fixed heights, `6` off)
 - timestamp: `ts`, added automatically
 - source: `src`, set to `anmq`
 
@@ -128,5 +132,6 @@ Supported AC commands:
 - `setFanSpeed`
 - `setMode`
 - `setDisplay`
+- `setCapacityProfile`
 - `setHorizontalSwing`
 - `setVerticalSwing`
