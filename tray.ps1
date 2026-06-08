@@ -181,6 +181,17 @@ function Set-CapacityProfile($eco, $esave = 0, $turbo = 0, $fanSpeed = $null, $t
 
 # --- Tray icon ---
 
+function New-RoundedRectPath($x, $y, $width, $height, $radius) {
+  $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+  $diameter = $radius * 2
+  $path.AddArc($x, $y, $diameter, $diameter, 180, 90)
+  $path.AddArc(($x + $width - $diameter), $y, $diameter, $diameter, 270, 90)
+  $path.AddArc(($x + $width - $diameter), ($y + $height - $diameter), $diameter, $diameter, 0, 90)
+  $path.AddArc($x, ($y + $height - $diameter), $diameter, $diameter, 90, 90)
+  $path.CloseFigure()
+  return $path
+}
+
 function New-TrayIcon {
   $bitmap = New-Object System.Drawing.Bitmap 64, 64
   $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
@@ -188,11 +199,29 @@ function New-TrayIcon {
   $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
   $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
   $graphics.Clear([System.Drawing.Color]::Transparent)
-  $brush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(36, 99, 169))
-  $graphics.FillEllipse($brush, 4, 4, 56, 56)
-  $pen = New-Object System.Drawing.Pen ([System.Drawing.Color]::White), 6
-  $graphics.DrawLine($pen, 20, 32, 44, 32)
-  $graphics.DrawLine($pen, 32, 20, 32, 44)
+
+  $scale = 64 / 44
+  $offset = -2 * $scale
+  $yOffset = 4
+  $blackPen = New-Object System.Drawing.Pen ([System.Drawing.Color]::Black), (3.4 * $scale)
+  $blackPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+  $blackPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+  $blackPen.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
+  $whiteBrush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White)
+  $blueBrush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(47, 136, 255))
+
+  $outer = New-RoundedRectPath ($offset + (4 * $scale)) ($yOffset + $offset + (8 * $scale)) (40 * $scale) (20 * $scale) (2 * $scale)
+  $inner = New-RoundedRectPath ($offset + (12 * $scale)) ($yOffset + $offset + (20 * $scale)) (24 * $scale) (8 * $scale) (1 * $scale)
+
+  $graphics.FillPath($whiteBrush, $outer)
+  $graphics.DrawPath($blackPen, $outer)
+  $graphics.FillPath($blueBrush, $inner)
+  $graphics.DrawPath($blackPen, $inner)
+  $graphics.DrawLine($blackPen, ($offset + (32 * $scale)), ($yOffset + $offset + (14 * $scale)), ($offset + (36 * $scale)), ($yOffset + $offset + (14 * $scale)))
+  $graphics.DrawLine($blackPen, ($offset + (24 * $scale)), ($yOffset + $offset + (34 * $scale)), ($offset + (24 * $scale)), ($yOffset + $offset + (40 * $scale)))
+  $graphics.DrawLine($blackPen, ($offset + (16 * $scale)), ($yOffset + $offset + (36 * $scale)), ($offset + (16 * $scale)), ($yOffset + $offset + (38 * $scale)))
+  $graphics.DrawLine($blackPen, ($offset + (32 * $scale)), ($yOffset + $offset + (36 * $scale)), ($offset + (32 * $scale)), ($yOffset + $offset + (38 * $scale)))
+
   $iconHandle = $bitmap.GetHicon()
   return [System.Drawing.Icon]::FromHandle($iconHandle)
 }
