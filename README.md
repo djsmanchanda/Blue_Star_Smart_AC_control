@@ -6,6 +6,7 @@ It runs a small Node.js service on `127.0.0.1:8765`, talks to your configured AC
 
 - a Windows system tray menu for quick changes
 - a browser panel at `http://127.0.0.1:8765/`
+- a command line shortcut for common controls
 
 ![Windows tray menu](assets/tray-menu.png)
 
@@ -90,6 +91,35 @@ The tray menu includes:
 - `Quit` to close the tray and stop the local service
 
 Important: `Quit` is intended to stop this tool entirely. It sends `POST /api/shutdown` to the local service and then falls back to killing the tray-started process if needed.
+
+## Using The CLI
+
+The package exposes an `ac` command. Link it once from this project folder:
+
+```powershell
+npm link
+```
+
+Then start the local service and run:
+
+```powershell
+ac on
+ac off
+ac display on
+ac display off
+ac 1+
+ac 1-
+ac 3+
+ac 3-
+ac set 27
+ac on 1h
+ac off 5m
+ac timer 1h
+ac timer 5m
+ac timer 1h 5m
+```
+
+Temperature step commands such as `ac 1+`, `ac 1-`, `ac 3+`, and `ac 3-` read the current AC status, then adjust the set temperature by that many degrees. `ac set 27` sets the target temperature directly. `ac on 1h` schedules an on timer, `ac off 5m` schedules an off timer, and `ac timer ...` remains an off-timer shortcut. For Blue Star cloud devices this writes the AC-native `ontimer` or `offtimer` minutes field; other providers fall back to in-memory service timers that are cleared if the service is stopped or restarted.
 
 ## Start Automatically With Windows
 

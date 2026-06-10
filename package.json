@@ -5,6 +5,9 @@
   "description": "Lightweight Windows tray service for Blue Star AC control.",
   "license": "Apache-2.0",
   "main": "service.js",
+  "bin": {
+    "ac": "cli.js"
+  },
   "scripts": {
     "start": "node service.js",
     "tray": "powershell -ExecutionPolicy Bypass -File .\\tray.ps1"
