@@ -59,6 +59,7 @@ let config = loadConfig();
 const host = config.host || "127.0.0.1";
 const port = Number(config.port || 8765);
 const deviceTimers = new Map();
+const nativeDeviceTimers = new Map();
 const maxTimerMs = 2_147_483_647;
 
 function log(entry) {
@@ -1011,6 +1012,52 @@ async function executeBlueStarLocal(device, command, value) {
   return executeWebhook(device, command, value);
 }
 
+function nativeTimerCacheKey(deviceId, kind) {
+  return `${deviceId}:${kind}`;
+}
+
+function rememberNativeTimer(deviceId, kind, minutes) {
+  const timerMinutes = Number(minutes);
+  const key = nativeTimerCacheKey(deviceId, kind);
+  if (!Number.isFinite(timerMinutes) || timerMinutes <= 0) {
+    nativeDeviceTimers.delete(key);
+    return;
+  }
+  nativeDeviceTimers.set(key, {
+    expiresAt: Date.now() + Math.ceil(timerMinutes) * 60 * 1000,
+  });
+}
+
+function activeNativeTimerMinutes(deviceId, kind) {
+  const key = nativeTimerCacheKey(deviceId, kind);
+  const existing = nativeDeviceTimers.get(key);
+  if (!existing) {
+    return null;
+  }
+  const remainingMinutes = Math.ceil((existing.expiresAt - Date.now()) / (60 * 1000));
+  if (remainingMinutes <= 0) {
+    nativeDeviceTimers.delete(key);
+    return null;
+  }
+  return remainingMinutes;
+}
+
+function nativeTimerFieldsForPayload(device, provider, desired) {
+  const fields = {};
+  for (const kind of ["on", "off"]) {
+    const commandName = kind === "on" ? "setOnTimer" : "setOffTimer";
+    const fieldName = kind === "on" ? "ontimer" : "offtimer";
+    if (!provider.commandPayloads?.[commandName] || desired[fieldName] !== undefined) {
+      continue;
+    }
+    const minutes = activeNativeTimerMinutes(device.id, kind);
+    if (minutes !== null) {
+      fields[fieldName] = minutes;
+    }
+  }
+  return fields;
+}
+
 function blueStarCloudPayload(provider, device, command, value) {
   const template = provider.commandPayloads?.[command];
   if (!template) {
@@ -1026,6 +1073,7 @@ function blueStarCloudPayload(provider, device, command, value) {
   return {
     state: {
       desired: {
+        ...nativeTimerFieldsForPayload(device, provider, desired),
         ...desired,
         src: provider.source || "anmq",
       },
@@ -1303,7 +1351,9 @@ async function getDeviceTimer(device, kind = "off") {
   const timerKind = normalizeTimerKind(kind);
   if (nativeTimerTemplate(device, timerKind)) {
     const status = await getDeviceStatus(device);
-    return timerFromMinutes(status?.state?.[nativeTimerStateField(timerKind)], timerKind);
+    const minutes = status?.state?.[nativeTimerStateField(timerKind)];
+    rememberNativeTimer(device.id, timerKind, minutes);
+    return timerFromMinutes(minutes, timerKind);
   }
   return activeDeviceTimer(device.id, timerKind);
 }
@@ -1318,6 +1368,7 @@ async function scheduleDeviceTimer(device, kind, durationSeconds) {
       throw new Error(`AC ${timerLabel(timerKind)} cannot be longer than 24 hours.`);
     }
     await executeCommand(device, nativeTimerCommand(timerKind), minutes);
+    rememberNativeTimer(device.id, timerKind, minutes);
     log(`timer scheduled device=${device.id} kind=${timerKind} source=ac minutes=${minutes}`);
     return timerFromMinutes(minutes, timerKind);
   }
@@ -1356,6 +1407,7 @@ async function cancelDeviceTimer(device, kind = "off") {
   const timerKind = normalizeTimerKind(kind);
   if (nativeTimerTemplate(device, timerKind)) {
     await executeCommand(device, nativeTimerCommand(timerKind), 0);
+    rememberNativeTimer(device.id, timerKind, 0);
     log(`timer cancelled device=${device.id} kind=${timerKind} source=ac`);
     return;
   }
