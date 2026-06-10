@@ -123,6 +123,23 @@ function Begin-ServiceStartup {
   }
 }
 
+function Stop-ServiceProcess {
+  try {
+    if (Test-Service) {
+      Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/shutdown" -TimeoutSec 2 | Out-Null
+      Start-Sleep -Milliseconds 300
+    }
+  } catch {}
+
+  if ($script:serviceProcess -and -not $script:serviceProcess.HasExited) {
+    try {
+      if (-not $script:serviceProcess.WaitForExit(1200)) {
+        $script:serviceProcess.Kill()
+      }
+    } catch {}
+  }
+}
+
 function Send-DeviceCommand($deviceId, $command, $value = $null) {
   $payload = @{ command = $command }
   if ($null -ne $value) {
@@ -443,9 +460,7 @@ Add-PopupSeparator $swingPanel
 $reloadButton = New-PopupButton "Reload" { Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/reload" -TimeoutSec 5 | Out-Null }
 $quitButton = New-PopupButton "Quit" {
   $notifyIcon.Visible = $false
-  if ($script:serviceProcess -and -not $script:serviceProcess.HasExited) {
-    $script:serviceProcess.Kill()
-  }
+  Stop-ServiceProcess
   [System.Windows.Forms.Application]::Exit()
 }
 $swingPanel.Controls.AddRange(@($reloadButton, $quitButton))

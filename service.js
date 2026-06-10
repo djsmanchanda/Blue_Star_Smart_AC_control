@@ -17,6 +17,7 @@ const mimeTypes = {
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
   ".svg": "image/svg+xml; charset=utf-8",
 };
 
@@ -70,6 +71,20 @@ function sendJson(res, statusCode, payload) {
     "Content-Length": Buffer.byteLength(body),
   });
   res.end(body);
+}
+
+function isLoopbackRequest(req) {
+  const address = req.socket.remoteAddress || "";
+  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
+}
+
+function shutdownService(res) {
+  sendJson(res, 200, { ok: true, shuttingDown: true });
+  log("shutdown requested");
+  setTimeout(() => {
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 1500).unref();
+  }, 50).unref();
 }
 
 function readBody(req) {
@@ -1231,6 +1246,14 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && requestUrl.pathname === "/api/reload") {
       config = loadConfig();
       sendJson(res, 200, { ok: true, devices: (config.devices || []).map(publicDevice) });
+      return;
+    }
+    if (req.method === "POST" && requestUrl.pathname === "/api/shutdown") {
+      if (!isLoopbackRequest(req)) {
+        sendJson(res, 403, { error: "Shutdown is only available from localhost." });
+        return;
+      }
+      shutdownService(res);
       return;
     }
     if (req.method === "GET" && requestUrl.pathname === "/api/network/interfaces") {

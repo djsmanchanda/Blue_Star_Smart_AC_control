@@ -1,71 +1,129 @@
-# AC Control
+# Blue Star Smart AC Control
 
-A lightweight Windows laptop service for controlling a Blue Star Smart AC from a local web panel and Windows system tray.
+A lightweight Windows tray app and local web panel for controlling a Blue Star Smart AC from your laptop.
 
-The service runs on `127.0.0.1:8765`, loads credentials from `.env`, talks to the Blue Star cloud through AWS IoT MQTT over WebSocket, and exposes local API endpoints for the tray and web UI.
+It runs a small Node.js service on `127.0.0.1:8765`, talks to your configured AC provider, and gives you two local control surfaces:
 
-## Run
+- a Windows system tray menu for quick changes
+- a browser panel at `http://127.0.0.1:8765/`
 
-Create `.env` from `.env.example`:
+![Windows tray menu](assets/tray-menu.png)
 
-```text
-BLUESTAR_AUTH_ID=your-phone-number
-BLUESTAR_PASSWORD=your-password
-```
+![Local web control panel](assets/web-panel.png)
 
-Start the local service:
+## What You Can Control
 
-```powershell
-node service.js
-```
+- Power on/off
+- Temperature up/down
+- Display light on/off
+- Fan speed: low, medium, high, turbo, auto
+- Mode: fan, heat, cool, dry, auto
+- Capacity profile: default, 100%, 80%, 60%, 40%, eco, turbo
+- Horizontal swing on/off
+- Vertical swing sweep, fixed positions, or off
+- Config reload without restarting the tray
 
-Open the web panel:
+The web panel does not continuously poll in the background. It reads AC status when the page loads, when you press refresh, and once after each command.
 
-```text
-http://127.0.0.1:8765/
-```
+## Requirements
 
-Start the tray app:
+- Windows 10 or Windows 11
+- Node.js 18 or newer
+- A Blue Star Smart AC account or a configured mock/local provider
+- Local access to this project folder
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\tray.ps1
-```
+## Quick Start
 
-Install tray startup after Windows sign-in:
+1. Install dependencies:
+
+   ```powershell
+   npm install
+   ```
+
+2. Create your environment file:
+
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+
+3. Edit `.env` and add your Blue Star credentials:
+
+   ```text
+   BLUESTAR_AUTH_ID=your-phone-number
+   BLUESTAR_PASSWORD=your-password
+   ```
+
+4. Review `config.json`.
+
+   For first-run testing, the included mock provider is the safest option because it lets you open the tray and web panel without sending commands to a real AC. To control your real AC, configure the `bluestar-cloud` provider and your device values.
+
+5. Start the local service:
+
+   ```powershell
+   npm start
+   ```
+
+6. Open the web panel:
+
+   ```text
+   http://127.0.0.1:8765/
+   ```
+
+7. Start the tray app:
+
+   ```powershell
+   npm run tray
+   ```
+
+## Using The Tray
+
+Run `npm run tray` to show the AC controls in the Windows system tray. The tray will start the local Node service automatically if nothing is already listening on the configured port.
+
+The tray menu includes:
+
+- `Open panel` to open the browser UI
+- power and display controls
+- temperature step controls
+- fan, profile, and swing controls
+- `Reload` to reload `config.json`
+- `Quit` to close the tray and stop the local service
+
+Important: `Quit` is intended to stop this tool entirely. It sends `POST /api/shutdown` to the local service and then falls back to killing the tray-started process if needed.
+
+## Start Automatically With Windows
+
+After setup, install the startup shortcut:
 
 ```powershell
 .\setup-startup.bat
 ```
 
-The tray menu provides:
+At your next Windows sign-in, the tray app will start automatically. The tray starts the background service when needed.
 
-- Open control panel
-- AC on/off
-- Increase temperature by 1 C
-- Decrease temperature by 1 C
-- Toggle display
-- Reload config
-- Quit
+To remove startup behavior later, delete the shortcut that the setup script created in your Windows Startup folder.
 
-## Controls
+## Configuration
 
-The web panel includes:
+The app reads:
 
-- current AC status
-- power on/off
-- temperature set and +/- controls
-- display on/off
-- fan speed: low, medium, high, turbo, auto
-- AC mode: fan, heat, cool, dry, auto
-- capacity profile: default, 100%, 80%, 60%, 40%, eco, turbo
-- horizontal swing on/off
-- vertical swing sweep and fixed heights
+- `.env` for secrets
+- `config.json` for host, port, devices, and provider settings
+- `config.example.json` as a reference configuration
 
-The web panel does not poll in the background. It reads MQTT status on page load, when you press Refresh, and once after each command.
+Default local address:
 
-## Blue Star Protocol
+```json
+{
+  "host": "127.0.0.1",
+  "port": 8765
+}
+```
 
-The Android app traffic points at AWS IoT MQTT:
+Keep the service bound to `127.0.0.1` unless you have a specific reason to expose it. The tray and web panel are designed for local laptop use.
+
+## Blue Star Cloud Notes
+
+The Blue Star cloud provider uses AWS IoT MQTT over WebSocket. Typical topics are:
 
 - normal control publish topic: `$aws/things/<thing-id>/shadow/update`
 - force-sync topic: `things/<thing-id>/control`
@@ -89,33 +147,20 @@ Normal controls are published as AWS IoT Shadow desired state:
 
 Current status is read by subscribing to `things/<thing-id>/state/reported` and publishing `{ "fpsh": 1 }` to `things/<thing-id>/control`.
 
-## Blue Star Keys
-
-- power: `pow` (`1` on, `0` off)
-- display: `display` (`1` on, `0` off)
-- set temperature: `stemp`, formatted like `"24.0"`
-- current room temperature: `ctemp`
-- mode: `mode` (`0` fan, `1` heat, `2` cool, `3` dry, `4` auto)
-- fan speed: `fspd` (`2` low, `3` medium, `4` high, `6` turbo, `7` auto)
-- capacity profile: `eco` (`0` default, `1` 100%, `2` 80%, `3` 60%, `4` 40%)
-- eco preset: `esave` (`1` on)
-- turbo preset: `turbo` (`3` on), also sets `fspd` to `6` and `stemp` to `"16.0"`
-- horizontal swing: `hswing` (`0` on, `6` off)
-- vertical swing: `vswing` (`0` sweep, `1`-`5` fixed heights, `6` off)
-- timestamp: `ts`, added automatically
-- source: `src`, set to `anmq`
-
 ## Local API
+
+The service exposes these localhost endpoints:
 
 ```text
 GET  /api/health
 GET  /api/devices
 POST /api/reload
+POST /api/shutdown
 GET  /api/devices/ac/status
 POST /api/devices/ac/commands
 ```
 
-Command body:
+Example command:
 
 ```json
 {
@@ -135,3 +180,29 @@ Supported AC commands:
 - `setCapacityProfile`
 - `setHorizontalSwing`
 - `setVerticalSwing`
+
+## Troubleshooting
+
+If the web panel does not open, check that the service is running:
+
+```powershell
+npm start
+```
+
+If the tray says the service is already running, open:
+
+```text
+http://127.0.0.1:8765/api/health
+```
+
+If commands do not reach the AC, confirm your `.env` credentials and `config.json` provider settings.
+
+Logs are written to:
+
+- `service.log`
+- `server.out.log`
+- `server.err.log`
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
