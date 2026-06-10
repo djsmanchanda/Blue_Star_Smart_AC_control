@@ -21,9 +21,10 @@ It runs a small Node.js service on `127.0.0.1:8765`, talks to your configured AC
 - Capacity profile: default, 100%, 80%, 60%, 40%, eco, turbo
 - Horizontal swing on/off
 - Vertical swing sweep, fixed positions, or off
+- AC on/off timers from the web panel or CLI
 - Config reload without restarting the tray
 
-The web panel does not continuously poll in the background. It reads AC status when the page loads, when you press refresh, and once after each command.
+The web panel does not continuously poll AC status in the background. It reads AC status when the page loads, when you press refresh, and once after each command. On/off timer countdowns update in the panel after they are set.
 
 ## Requirements
 
@@ -145,6 +146,8 @@ Normal controls are published as AWS IoT Shadow desired state:
 }
 ```
 
+The `ts` value is a UTC Unix timestamp in milliseconds on normal desired/reported state payloads. It is the command/report timestamp, not the timer duration. Blue Star timers are represented by reported `ontimer` and `offtimer` fields in minutes, for example `68` means about 68 minutes remaining. The web panel displays both timer fields and the reported `ts`.
+
 Current status is read by subscribing to `things/<thing-id>/state/reported` and publishing `{ "fpsh": 1 }` to `things/<thing-id>/control`.
 
 ## Local API
@@ -158,6 +161,15 @@ POST /api/reload
 POST /api/shutdown
 GET  /api/devices/ac/status
 POST /api/devices/ac/commands
+GET  /api/devices/ac/timer
+POST /api/devices/ac/timer
+DELETE /api/devices/ac/timer
+GET  /api/devices/ac/timers/on
+POST /api/devices/ac/timers/on
+DELETE /api/devices/ac/timers/on
+GET  /api/devices/ac/timers/off
+POST /api/devices/ac/timers/off
+DELETE /api/devices/ac/timers/off
 ```
 
 Example command:
@@ -180,6 +192,29 @@ Supported AC commands:
 - `setCapacityProfile`
 - `setHorizontalSwing`
 - `setVerticalSwing`
+
+Timer request:
+
+```json
+{
+  "durationSeconds": 3900
+}
+```
+
+Timer response:
+
+```json
+{
+  "timer": {
+    "dueAt": "2026-06-10T13:05:00.000Z",
+    "durationSeconds": 3900,
+    "remainingSeconds": 3900,
+    "command": "turnOff"
+  }
+}
+```
+
+For Blue Star cloud devices the timer API sends `setOnTimer` with `ontimer` minutes or `setOffTimer` with `offtimer` minutes and the normal `ts` command timestamp. Use `DELETE /api/devices/ac/timers/on` or `/timers/off` to send the matching timer value as `0`. The legacy `/api/devices/ac/timer` endpoint is kept as an off-timer alias for the CLI. Providers without a native timer template use local service timers that send the normal `turnOn` or `turnOff` command when the countdown finishes.
 
 ## Troubleshooting
 

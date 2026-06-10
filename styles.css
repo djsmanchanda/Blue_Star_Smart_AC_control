@@ -157,6 +157,28 @@ input:focus-visible {
   align-items: center;
 }
 
+.timer-summary {
+  min-height: 40px;
+  min-width: min(100%, 280px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #11171d;
+}
+
+.timer-summary strong {
+  font-size: 1rem;
+}
+
+.timer-summary span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
 .command.primary {
   background: var(--blue-bg);
   border-color: #2a5b91;

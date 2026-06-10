@@ -58,6 +58,8 @@ loadEnvFile();
 let config = loadConfig();
 const host = config.host || "127.0.0.1";
 const port = Number(config.port || 8765);
+const deviceTimers = new Map();
+const maxTimerMs = 2_147_483_647;
 
 function log(entry) {
   const line = `${new Date().toISOString()} ${entry}\n`;
@@ -1213,6 +1215,154 @@ async function executeCommand(device, command, value) {
   return executeWebhook(device, command, value);
 }
 
+function timerKey(deviceId, kind) {
+  return `${deviceId}:${kind}`;
+}
+
+function timerCommand(kind) {
+  return kind === "on" ? "turnOn" : "turnOff";
+}
+
+function nativeTimerCommand(kind) {
+  return kind === "on" ? "setOnTimer" : "setOffTimer";
+}
+
+function nativeTimerStateField(kind) {
+  return kind === "on" ? "ontimer" : "offtimer";
+}
+
+function timerLabel(kind) {
+  return kind === "on" ? "on timer" : "off timer";
+}
+
+function normalizeTimerKind(kind) {
+  if (kind === "on" || kind === "off") {
+    return kind;
+  }
+  throw new Error("Timer kind must be on or off.");
+}
+
+function clearDeviceTimer(deviceId, kind = "off") {
+  const existing = deviceTimers.get(timerKey(deviceId, kind));
+  if (existing) {
+    clearTimeout(existing.timeout);
+    deviceTimers.delete(timerKey(deviceId, kind));
+  }
+}
+
+function activeDeviceTimer(deviceId, kind = "off") {
+  const existing = deviceTimers.get(timerKey(deviceId, kind));
+  if (!existing) {
+    return null;
+  }
+  const remainingSeconds = Math.max(0, Math.ceil((Date.parse(existing.dueAt) - Date.now()) / 1000));
+  return {
+    dueAt: existing.dueAt,
+    durationSeconds: existing.durationSeconds,
+    remainingSeconds,
+    command: existing.command,
+    kind,
+    source: "service",
+  };
+}
+
+function nativeTimerTemplate(device, kind = "off") {
+  const provider = config.providers?.[device.provider];
+  return provider?.commandPayloads?.[nativeTimerCommand(kind)];
+}
+
+function timerFromMinutes(minutes, kind = "off") {
+  const remainingMinutes = Number(minutes);
+  if (!Number.isFinite(remainingMinutes) || remainingMinutes <= 0) {
+    return null;
+  }
+  const durationSeconds = Math.ceil(remainingMinutes) * 60;
+  return {
+    dueAt: new Date(Date.now() + durationSeconds * 1000).toISOString(),
+    durationSeconds,
+    remainingSeconds: durationSeconds,
+    command: timerCommand(kind),
+    kind,
+    source: "ac",
+  };
+}
+
+function validateTimerSeconds(durationSeconds) {
+  const seconds = Number(durationSeconds);
+  const delayMs = seconds * 1000;
+  if (!Number.isSafeInteger(seconds) || seconds <= 0) {
+    throw new Error("Timer duration must be a positive whole number of seconds.");
+  }
+  if (delayMs > maxTimerMs) {
+    throw new Error("Timer duration cannot be longer than 24 days.");
+  }
+  return seconds;
+}
+
+async function getDeviceTimer(device, kind = "off") {
+  const timerKind = normalizeTimerKind(kind);
+  if (nativeTimerTemplate(device, timerKind)) {
+    const status = await getDeviceStatus(device);
+    return timerFromMinutes(status?.state?.[nativeTimerStateField(timerKind)], timerKind);
+  }
+  return activeDeviceTimer(device.id, timerKind);
+}
+
+async function scheduleDeviceTimer(device, kind, durationSeconds) {
+  const timerKind = normalizeTimerKind(kind);
+  const seconds = validateTimerSeconds(durationSeconds);
+
+  if (nativeTimerTemplate(device, timerKind)) {
+    const minutes = Math.ceil(seconds / 60);
+    if (minutes > 24 * 60) {
+      throw new Error(`AC ${timerLabel(timerKind)} cannot be longer than 24 hours.`);
+    }
+    await executeCommand(device, nativeTimerCommand(timerKind), minutes);
+    log(`timer scheduled device=${device.id} kind=${timerKind} source=ac minutes=${minutes}`);
+    return timerFromMinutes(minutes, timerKind);
+  }
+
+  clearDeviceTimer(device.id, timerKind);
+
+  const delayMs = seconds * 1000;
+  const dueAt = new Date(Date.now() + delayMs).toISOString();
+  const timeout = setTimeout(async () => {
+    deviceTimers.delete(timerKey(device.id, timerKind));
+    const currentDevice = findDevice(device.id);
+    if (!currentDevice) {
+      log(`timer skipped device=${device.id} kind=${timerKind} reason=missing-device`);
+      return;
+    }
+    try {
+      await executeCommand(currentDevice, timerCommand(timerKind));
+      log(`timer fired device=${device.id} kind=${timerKind} command=${timerCommand(timerKind)}`);
+    } catch (error) {
+      log(`timer error device=${device.id} kind=${timerKind} ${error.message}`);
+    }
+  }, delayMs);
+  timeout.unref?.();
+
+  deviceTimers.set(timerKey(device.id, timerKind), {
+    dueAt,
+    durationSeconds: seconds,
+    command: timerCommand(timerKind),
+    timeout,
+  });
+  log(`timer scheduled device=${device.id} kind=${timerKind} dueAt=${dueAt}`);
+  return activeDeviceTimer(device.id, timerKind);
+}
+
+async function cancelDeviceTimer(device, kind = "off") {
+  const timerKind = normalizeTimerKind(kind);
+  if (nativeTimerTemplate(device, timerKind)) {
+    await executeCommand(device, nativeTimerCommand(timerKind), 0);
+    log(`timer cancelled device=${device.id} kind=${timerKind} source=ac`);
+    return;
+  }
+  clearDeviceTimer(device.id, timerKind);
+  log(`timer cancelled device=${device.id} kind=${timerKind}`);
+}
+
 function serveStatic(req, res, pathname) {
   const filePath = pathname === "/" ? path.join(root, "index.html") : path.join(root, pathname.slice(1));
   const resolved = path.resolve(filePath);
@@ -1263,6 +1413,66 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && requestUrl.pathname === "/api/discovery/scan") {
       const body = await readBody(req);
       sendJson(res, 200, await scanLan(body));
+      return;
+    }
+
+    const timerMatch = requestUrl.pathname.match(/^\/api\/devices\/([^/]+)\/timer$/);
+    const typedTimerMatch = requestUrl.pathname.match(/^\/api\/devices\/([^/]+)\/timers\/(on|off)$/);
+    const activeTimerMatch = typedTimerMatch || timerMatch;
+    if (req.method === "GET" && timerMatch) {
+      const device = findDevice(decodeURIComponent(timerMatch[1]));
+      if (!device) {
+        sendJson(res, 404, { error: "Device not configured." });
+        return;
+      }
+      sendJson(res, 200, {
+        ok: true,
+        device: publicDevice(device),
+        timer: await getDeviceTimer(device),
+      });
+      return;
+    }
+    if (req.method === "GET" && typedTimerMatch) {
+      const device = findDevice(decodeURIComponent(typedTimerMatch[1]));
+      if (!device) {
+        sendJson(res, 404, { error: "Device not configured." });
+        return;
+      }
+      sendJson(res, 200, {
+        ok: true,
+        device: publicDevice(device),
+        timer: await getDeviceTimer(device, typedTimerMatch[2]),
+      });
+      return;
+    }
+    if (req.method === "POST" && activeTimerMatch) {
+      const device = findDevice(decodeURIComponent(activeTimerMatch[1]));
+      if (!device) {
+        sendJson(res, 404, { error: "Device not configured." });
+        return;
+      }
+      const kind = activeTimerMatch === typedTimerMatch ? typedTimerMatch[2] : "off";
+      const body = await readBody(req);
+      sendJson(res, 200, {
+        ok: true,
+        device: publicDevice(device),
+        timer: await scheduleDeviceTimer(device, kind, body.durationSeconds),
+      });
+      return;
+    }
+    if (req.method === "DELETE" && activeTimerMatch) {
+      const device = findDevice(decodeURIComponent(activeTimerMatch[1]));
+      if (!device) {
+        sendJson(res, 404, { error: "Device not configured." });
+        return;
+      }
+      const kind = activeTimerMatch === typedTimerMatch ? typedTimerMatch[2] : "off";
+      await cancelDeviceTimer(device, kind);
+      sendJson(res, 200, {
+        ok: true,
+        device: publicDevice(device),
+        timer: null,
+      });
       return;
     }
 

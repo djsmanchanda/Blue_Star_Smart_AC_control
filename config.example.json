@@ -45,6 +45,9 @@
         "turnOff": {
           "pow": 0
         },
+        "setOnTimer": {
+          "ontimer": "${VALUE_NUMBER}"
+        },
         "setTemperature": {
           "stemp": "${VALUE_FIXED1}"
         },
@@ -62,6 +65,9 @@
         },
         "setVerticalSwing": {
           "vswing": "${VALUE_NUMBER}"
+        },
+        "setOffTimer": {
+          "offtimer": "${VALUE_NUMBER}"
         },
         "setCapacityProfile": "${VALUE_OBJECT}"
       }

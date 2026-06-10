@@ -53,10 +53,14 @@ const commandLabels = {
   setHorizontalSwing: "Horizontal swing",
   setVerticalSwing: "Vertical swing",
   setCapacityProfile: "Capacity profile",
+  setOnTimer: "On timer",
+  setOffTimer: "Off timer",
 };
 
 let acDevice;
 let currentStatus;
+let currentTimers = { on: null, off: null };
+let timerTicker;
 
 function setStatus(message, tone = "neutral") {
   statusText.textContent = message;
@@ -113,6 +117,112 @@ function activeClass(isActive) {
   return isActive ? "active" : "";
 }
 
+function formatDuration(totalSeconds) {
+  const seconds = Math.max(0, Number(totalSeconds) || 0);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  const parts = [];
+  if (hours) {
+    parts.push(`${hours}h`);
+  }
+  if (minutes) {
+    parts.push(`${minutes}m`);
+  }
+  if (!hours && remainingSeconds) {
+    parts.push(`${remainingSeconds}s`);
+  }
+  return parts.join(" ") || "0s";
+}
+
+function formatAcTimestamp(value) {
+  const timestamp = Number(value);
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return "Unknown";
+  }
+  const milliseconds = timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp;
+  const date = new Date(milliseconds);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+  return `${date.toLocaleString()} (${date.toISOString().replace(".000Z", "Z")})`;
+}
+
+function formatReportedTimer(value) {
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return "Off";
+  }
+  return formatDuration(Math.ceil(minutes) * 60);
+}
+
+function timerFromReportedTimer(value, kind) {
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return null;
+  }
+  const durationSeconds = Math.ceil(minutes) * 60;
+  return {
+    dueAt: new Date(Date.now() + durationSeconds * 1000).toISOString(),
+    durationSeconds,
+    remainingSeconds: durationSeconds,
+    command: kind === "on" ? "turnOn" : "turnOff",
+    kind,
+    source: "ac",
+  };
+}
+
+function remainingTimerSeconds(kind) {
+  const timer = currentTimers[kind];
+  if (!timer?.dueAt) {
+    return 0;
+  }
+  return Math.max(0, Math.ceil((Date.parse(timer.dueAt) - Date.now()) / 1000));
+}
+
+function updateTimerDisplay() {
+  for (const kind of ["on", "off"]) {
+    const remainingElement = document.querySelector(`#timer-${kind}-remaining`);
+    const dueElement = document.querySelector(`#timer-${kind}-due`);
+    const cancelButton = document.querySelector(`#timer-${kind}-cancel`);
+    if (!remainingElement || !dueElement || !cancelButton) {
+      continue;
+    }
+
+    const remaining = remainingTimerSeconds(kind);
+    const timer = currentTimers[kind];
+    if (timer?.dueAt && remaining > 0) {
+      remainingElement.textContent = formatDuration(remaining);
+      dueElement.textContent = `Turns ${kind} at ${new Date(timer.dueAt).toLocaleString()}`;
+      cancelButton.disabled = false;
+    } else {
+      remainingElement.textContent = "No timer set";
+      dueElement.textContent = `Set an AC ${kind} timer from this panel.`;
+      cancelButton.disabled = true;
+    }
+  }
+}
+
+function startTimerTicker() {
+  clearInterval(timerTicker);
+  updateTimerDisplay();
+  if (!["on", "off"].some((kind) => currentTimers[kind]?.dueAt && remainingTimerSeconds(kind) > 0)) {
+    return;
+  }
+  timerTicker = setInterval(() => {
+    updateTimerDisplay();
+    for (const kind of ["on", "off"]) {
+      if (currentTimers[kind]?.dueAt && remainingTimerSeconds(kind) <= 0) {
+        currentTimers[kind] = null;
+      }
+    }
+    if (!["on", "off"].some((kind) => currentTimers[kind]?.dueAt && remainingTimerSeconds(kind) > 0)) {
+      clearInterval(timerTicker);
+      updateTimerDisplay();
+    }
+  }, 1000);
+}
+
 function controlGroup(title, controls) {
   const section = document.createElement("section");
   section.className = "control-group";
@@ -155,6 +265,74 @@ function capacityButtons() {
   ));
 }
 
+async function loadTimer(kind) {
+  const { timer } = await api(`/api/devices/${encodeURIComponent(acDevice.id)}/timers/${kind}`);
+  currentTimers[kind] = timer;
+  startTimerTicker();
+}
+
+async function scheduleTimer(kind, durationSeconds) {
+  const { timer } = await api(`/api/devices/${encodeURIComponent(acDevice.id)}/timers/${kind}`, {
+    method: "POST",
+    body: JSON.stringify({ durationSeconds }),
+  });
+  currentTimers[kind] = timer;
+  renderControls();
+  setStatus(`AC ${kind} timer set for ${formatDuration(durationSeconds)}.`, "ok");
+}
+
+async function cancelTimer(kind) {
+  await api(`/api/devices/${encodeURIComponent(acDevice.id)}/timers/${kind}`, { method: "DELETE" });
+  currentTimers[kind] = null;
+  renderControls();
+  setStatus(`AC ${kind} timer cancelled.`, "ok");
+}
+
+function timerControls(kind) {
+  const customMinutes = document.createElement("input");
+  customMinutes.type = "number";
+  customMinutes.min = "1";
+  customMinutes.max = String(24 * 60);
+  customMinutes.step = "1";
+  customMinutes.value = kind === "off" ? "65" : "30";
+  customMinutes.setAttribute("aria-label", `${kind} timer minutes`);
+
+  const summary = document.createElement("div");
+  summary.className = "timer-summary";
+
+  const remaining = document.createElement("strong");
+  remaining.id = `timer-${kind}-remaining`;
+  remaining.textContent = "No timer set";
+
+  const due = document.createElement("span");
+  due.id = `timer-${kind}-due`;
+  due.textContent = `Set an AC ${kind} timer from this panel.`;
+
+  summary.append(remaining, due);
+
+  const setCustom = button("Set minutes", () => {
+    const minutes = Number(customMinutes.value);
+    if (!Number.isSafeInteger(minutes) || minutes <= 0) {
+      throw new Error("Timer minutes must be a positive whole number.");
+    }
+    return scheduleTimer(kind, minutes * 60);
+  }, "primary");
+
+  const cancel = button("Cancel timer", () => cancelTimer(kind), "danger");
+  cancel.id = `timer-${kind}-cancel`;
+  cancel.disabled = !currentTimers[kind]?.dueAt || remainingTimerSeconds(kind) <= 0;
+
+  return [
+    summary,
+    button("30m", () => scheduleTimer(kind, 30 * 60)),
+    button("1h", () => scheduleTimer(kind, 60 * 60)),
+    button("65m", () => scheduleTimer(kind, 65 * 60)),
+    customMinutes,
+    setCustom,
+    cancel,
+  ];
+}
+
 function renderStatus() {
   const summary = currentStatus?.summary || {};
   const state = currentStatus?.state || {};
@@ -168,6 +346,9 @@ function renderStatus() {
     ["Display", summary.display],
     ["H swing", summary.horizontalSwing],
     ["V swing", summary.verticalSwing],
+    ["On timer", formatReportedTimer(state.ontimer)],
+    ["Off timer", formatReportedTimer(state.offtimer)],
+    ["AC timestamp", formatAcTimestamp(state.ts)],
   ];
 
   const grid = document.createElement("dl");
@@ -265,17 +446,27 @@ function renderControls() {
       button("Display on", () => sendCommand("setDisplay", 1), activeClass(state.display === 1)),
       button("Display off", () => sendCommand("setDisplay", 0), activeClass(state.display === 0)),
     ]),
+    controlGroup("On Timer", timerControls("on")),
+    controlGroup("Off Timer", timerControls("off")),
     controlGroup("Capacity", capacityButtons()),
     controlGroup("Fan Speed", optionButtons(fanSpeeds, "setFanSpeed", state.fspd)),
     controlGroup("AC Mode", optionButtons(acModes, "setMode", state.mode)),
     controlGroup("Horizontal Swing", optionButtons(horizontalSwingOptions, "setHorizontalSwing", state.hswing)),
     controlGroup("Vertical Swing", optionButtons(verticalSwingOptions, "setVerticalSwing", state.vswing)),
   );
+  startTimerTicker();
 }
 
 async function loadStatus() {
   const { status } = await api(`/api/devices/${encodeURIComponent(acDevice.id)}/status`);
   currentStatus = status;
+  for (const kind of ["on", "off"]) {
+    const field = kind === "on" ? "ontimer" : "offtimer";
+    const reportedTimer = timerFromReportedTimer(status?.state?.[field], kind);
+    if (reportedTimer || currentTimers[kind]?.source === "ac") {
+      currentTimers[kind] = reportedTimer;
+    }
+  }
   renderControls();
   setStatus("AC status refreshed.", "ok");
 }
@@ -288,6 +479,9 @@ async function loadApp() {
     throw new Error("AC device is not configured.");
   }
   await loadStatus();
+  if (acDevice.provider !== "bluestar-cloud") {
+    await Promise.all([loadTimer("on"), loadTimer("off")]);
+  }
 }
 
 refreshButton.addEventListener("click", async () => {
