@@ -35,6 +35,9 @@ function usage() {
     "  ac timer 1h",
     "  ac timer 5m",
     "  ac timer 1h 5m",
+    "  ac timer cancel",
+    "  ac timer cancel on",
+    "  ac timer cancel off",
   ].join("\n");
 }
 
@@ -115,6 +118,20 @@ async function scheduleTimer(parts) {
   return scheduleTimerKind(kind, parts);
 }
 
+async function cancelTimer(parts) {
+  const kind = parts[0] || "off";
+  if (!["on", "off"].includes(kind)) {
+    throw new Error("Timer cancel target must be on or off.");
+  }
+  if (parts.length > 1) {
+    throw new Error("Timer cancel accepts only one optional target: on or off.");
+  }
+  await api(`/api/devices/${encodeURIComponent(deviceId)}/timers/${kind}`, {
+    method: "DELETE",
+  });
+  console.log(`AC ${kind} timer cancelled.`);
+}
+
 async function scheduleTimerKind(kind, parts) {
   const durationSeconds = parseDuration(parts);
   const result = await api(`/api/devices/${encodeURIComponent(deviceId)}/timers/${kind}`, {
@@ -181,6 +198,10 @@ async function main() {
   }
 
   if (args[0] === "timer") {
+    if (args[1] === "cancel") {
+      await cancelTimer(args.slice(2));
+      return;
+    }
     await scheduleTimer(args.slice(1));
     return;
   }
