@@ -1,0 +1,25 @@
+plugins {
+    id "com.android.application"
+}
+
+def privateProperties = new Properties()
+def privatePropertiesFile = project.file("local.properties")
+if (privatePropertiesFile.exists()) {
+    privatePropertiesFile.withInputStream { privateProperties.load(it) }
+}
+
+android {
+    namespace "com.bluestar.accontrol"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.bluestar.accontrol"
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName "0.1.0"
+        resValue "bool", "use_embedded_connection_defaults", privateProperties.getProperty("useEmbeddedConnectionDefaults", "false")
+        resValue "string", "embedded_base_url", privateProperties.getProperty("embeddedBaseUrl", "")
+        resValue "string", "embedded_device_id", privateProperties.getProperty("embeddedDeviceId", "ac")
+    }
+}

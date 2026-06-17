@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Blue Star AC</string>
+    <string name="default_base_url">http://192.168.1.10:8765</string>
+    <string name="default_device_id">ac</string>
+</resources>
