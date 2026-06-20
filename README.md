@@ -2,11 +2,12 @@
 
 A lightweight Windows tray app and local web panel for controlling a Blue Star Smart AC from your laptop.
 
-It runs a small Node.js service on `127.0.0.1:8765`, talks to your configured AC provider, and gives you two local control surfaces:
+It runs a small Node.js service on `127.0.0.1:8765`, talks to your configured AC provider, and gives you several local control surfaces:
 
 - a Windows system tray menu for quick changes
 - a browser panel at `http://127.0.0.1:8765/`
 - a command line shortcut for common controls
+- an optional Android app and home-screen widget under `android/`
 
 ![Windows tray menu](assets/tray-menu.png)
 
@@ -123,6 +124,48 @@ ac timer cancel off
 ```
 
 Temperature step commands such as `ac 1+`, `ac 1-`, `ac 3+`, and `ac 3-` read the current AC status, then adjust the set temperature by that many degrees. `ac set 27` sets the target temperature directly. `ac on 1h` schedules an on timer, `ac off 5m` schedules an off timer, and `ac timer ...` remains an off-timer shortcut. `ac timer cancel` cancels the off timer by default; pass `on` or `off` to cancel a specific timer. For Blue Star cloud devices this writes the AC-native `ontimer` or `offtimer` minutes field; other providers fall back to in-memory service timers that are cleared if the service is stopped or restarted.
+
+## Android App And Widget
+
+The `android/` folder contains a small native Android app that controls the same local HTTP API. It includes:
+
+- a settings screen for the service URL and device id
+- a compact 2-cell home-screen widget with a minimal live-state control and display-light toggle
+- cached widget state so taps feel immediate while the API request completes
+
+Build it from Android Studio by opening the `android/` folder, or from a machine with the Android Gradle Plugin available:
+
+```powershell
+cd android
+gradle :app:assembleDebug
+```
+
+Android cannot reach the Windows service at `127.0.0.1` because that address points back to the phone. To use the widget from your phone, run the service on an address reachable from your local network, then enter that URL in the Android app, for example:
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 8765
+}
+```
+
+Then save a URL like this in the Android app:
+
+```text
+http://192.168.1.23:8765
+```
+
+Only expose the service on a trusted private network. The local API currently has no authentication, so anyone who can reach that host and port can send AC commands. Keep `device id` as `ac` unless you changed it in `config.json`.
+
+The Android APK does not include Blue Star account credentials. Keep `BLUESTAR_AUTH_ID` and `BLUESTAR_PASSWORD` in the local Node service `.env`; the Android app only talks to that service over your LAN.
+
+The home-screen widget uses a minimal live-state control. When the AC is on in Cool mode it shows the set temperature and display state, for example `27` and `On`. Tap the center state to toggle AC power. Tap the upper/lower part of the state area to adjust temperature.
+
+If the AC is on but not in Cool mode, the widget shows `Alt Mode` plus the display state. Tapping the center state turns the AC off. Tapping the upper/lower state area switches back to Cool mode and sets the temperature.
+
+Android home-screen widgets do not receive continuous drag gestures, so the widget mirrors press-and-swipe with invisible upper/lower tap zones. The right-side `On`/`Off` state toggles the display light. When the AC is off, the widget shows only `Off`.
+
+The widget is intentionally light: automatic background status refreshes are rate-limited to once every 45 minutes, including after device boot. Tapping widget commands can still read status after the command completes so the displayed state stays accurate. If the widget is installed, Android will wake the widget receiver after boot; there is no always-running foreground service.
 
 ## Start Automatically With Windows
 
