@@ -6,8 +6,14 @@ server.err.log
 hs_err_pid*.log
 node_modules/
 .idea/
+android/.gradle/
+android/.manual-build*/
+android/local.properties
+android/app/local.properties
+android/**/build/
 reverse/
 *.apk
+*.idsig
 *.jar
 *.zip
 *.class
