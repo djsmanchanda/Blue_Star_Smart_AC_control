@@ -16,8 +16,14 @@ final class AcPrefs {
     private static final String KEY_MODE_VALUE = "mode_value";
     private static final String KEY_MODE_LABEL = "mode_label";
     private static final String KEY_HAS_MODE = "has_mode";
+    private static final String KEY_WIDGET_THEME = "widget_theme";
+    private static final String KEY_WIDGET_BACKGROUND_OPACITY = "widget_background_opacity";
     private static final String KEY_LAST_BACKGROUND_REFRESH_MS = "last_background_refresh_ms";
     private static final String KEY_LAST_ERROR = "last_error";
+
+    static final String WIDGET_THEME_SYSTEM = "system";
+    static final String WIDGET_THEME_LIGHT = "light";
+    static final String WIDGET_THEME_DARK = "dark";
 
     private final Context context;
     private final SharedPreferences prefs;
@@ -136,5 +142,36 @@ final class AcPrefs {
         prefs.edit()
                 .putLong(KEY_LAST_BACKGROUND_REFRESH_MS, nowMs)
                 .apply();
+    }
+
+    String getWidgetTheme() {
+        String theme = prefs.getString(KEY_WIDGET_THEME, WIDGET_THEME_SYSTEM);
+        if (WIDGET_THEME_LIGHT.equals(theme) || WIDGET_THEME_DARK.equals(theme)) {
+            return theme;
+        }
+        return WIDGET_THEME_SYSTEM;
+    }
+
+    void saveWidgetTheme(String theme) {
+        String normalized = WIDGET_THEME_LIGHT.equals(theme) || WIDGET_THEME_DARK.equals(theme)
+                ? theme
+                : WIDGET_THEME_SYSTEM;
+        prefs.edit()
+                .putString(KEY_WIDGET_THEME, normalized)
+                .apply();
+    }
+
+    int getWidgetBackgroundOpacity() {
+        return clampPercent(prefs.getInt(KEY_WIDGET_BACKGROUND_OPACITY, 0));
+    }
+
+    void saveWidgetBackgroundOpacity(int opacityPercent) {
+        prefs.edit()
+                .putInt(KEY_WIDGET_BACKGROUND_OPACITY, clampPercent(opacityPercent))
+                .apply();
+    }
+
+    private static int clampPercent(int value) {
+        return Math.max(0, Math.min(100, value));
     }
 }

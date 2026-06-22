@@ -1,0 +1,10 @@
+<resources>
+    <color name="brand_blue">#8AB4F8</color>
+    <color name="brand_blue_dark">#AECBFA</color>
+    <color name="surface">#101418</color>
+    <color name="text_primary">#E8EEF6</color>
+    <color name="text_secondary">#A9B4C2</color>
+    <color name="widget_text_primary">#F3F7FC</color>
+    <color name="widget_text_secondary">#A9B4C2</color>
+    <color name="widget_alt_mode">#FFD27A</color>
+</resources>

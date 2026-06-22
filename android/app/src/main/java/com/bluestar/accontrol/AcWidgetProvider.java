@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.widget.RemoteViews;
 
@@ -62,14 +63,17 @@ public class AcWidgetProvider extends AppWidgetProvider {
     private static void renderWidget(Context context, AppWidgetManager manager, int appWidgetId) {
         AcPrefs prefs = new AcPrefs(context);
         AcStatus status = prefs.getLastStatus();
+        WidgetPalette palette = WidgetPalette.from(context, prefs);
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_ac_control);
+        applyBackground(views, palette);
 
         if (!prefs.hasBaseUrl()) {
             views.setTextViewText(R.id.widget_main_state, "Set URL");
-            views.setTextViewText(R.id.widget_display_state, "Open");
+            views.setTextViewText(R.id.widget_power_state, "Open App");
+            views.setTextViewText(R.id.widget_display_state, "Set URL");
             PendingIntent openApp = openAppIntent(context);
             views.setOnClickPendingIntent(R.id.widget_root, openApp);
-            views.setOnClickPendingIntent(R.id.widget_center_tap, openApp);
+            views.setOnClickPendingIntent(R.id.widget_power_state, openApp);
             views.setOnClickPendingIntent(R.id.widget_display_state, openApp);
             manager.updateAppWidget(appWidgetId, views);
             return;
@@ -81,16 +85,20 @@ public class AcWidgetProvider extends AppWidgetProvider {
         } else {
             views.setTextViewText(R.id.widget_main_state, primaryStateText(status));
         }
+        views.setTextViewText(R.id.widget_power_state, powerStateText(status));
         views.setTextViewText(R.id.widget_display_state, displayStateText(status));
+        views.setTextViewText(R.id.widget_zone_up, "\u25B2");
+        views.setTextViewText(R.id.widget_zone_down, "\u25BC");
 
-        styleMainState(views, status);
-        styleDisplayState(views, status);
+        styleMainState(views, status, palette);
+        stylePowerState(views, status, palette);
+        styleDisplayState(views, status, palette);
+        styleStepButtons(views, palette);
 
-        views.setOnClickPendingIntent(R.id.widget_root, openAppIntent(context));
+        views.setOnClickPendingIntent(R.id.widget_power_state, broadcastIntent(context, ACTION_POWER_TOGGLE));
+        views.setOnClickPendingIntent(R.id.widget_display_state, broadcastIntent(context, ACTION_DISPLAY_TOGGLE));
         views.setOnClickPendingIntent(R.id.widget_zone_up, broadcastIntent(context, ACTION_TEMP_UP));
         views.setOnClickPendingIntent(R.id.widget_zone_down, broadcastIntent(context, ACTION_TEMP_DOWN));
-        views.setOnClickPendingIntent(R.id.widget_center_tap, broadcastIntent(context, ACTION_POWER_TOGGLE));
-        views.setOnClickPendingIntent(R.id.widget_display_state, broadcastIntent(context, ACTION_DISPLAY_TOGGLE));
         manager.updateAppWidget(appWidgetId, views);
     }
 
@@ -107,27 +115,53 @@ public class AcWidgetProvider extends AppWidgetProvider {
         return String.valueOf(status.temperatureCelsius);
     }
 
-    private static String displayStateText(AcStatus status) {
-        if (status.hasPower && !status.powerOn) {
-            return "";
+    private static String powerStateText(AcStatus status) {
+        if (!status.hasPower) {
+            return "AC --";
         }
-        if (!status.hasDisplay) {
-            return "--";
-        }
-        return status.displayOn ? "On" : "Off";
+        return status.powerOn ? "AC On" : "AC Off";
     }
 
-    private static void styleMainState(RemoteViews views, AcStatus status) {
-        int color = status.isAltMode() ? Color.rgb(137, 85, 0) : Color.rgb(22, 32, 42);
+    private static String displayStateText(AcStatus status) {
+        if (!status.hasDisplay) {
+            return "Display --";
+        }
+        return status.displayOn ? "Display On" : "Display Off";
+    }
+
+    private static void styleMainState(RemoteViews views, AcStatus status, WidgetPalette palette) {
+        int color = status.isAltMode() ? palette.altMode : palette.primary;
         if (status.hasPower && !status.powerOn) {
-            color = Color.rgb(95, 108, 123);
+            color = palette.secondary;
         }
         views.setTextColor(R.id.widget_main_state, color);
     }
 
-    private static void styleDisplayState(RemoteViews views, AcStatus status) {
-        int color = status.hasDisplay && status.displayOn ? Color.rgb(22, 32, 42) : Color.rgb(95, 108, 123);
+    private static void stylePowerState(RemoteViews views, AcStatus status, WidgetPalette palette) {
+        int color = status.hasPower && status.powerOn
+                ? palette.primary
+                : palette.secondary;
+        views.setTextColor(R.id.widget_power_state, color);
+    }
+
+    private static void styleDisplayState(RemoteViews views, AcStatus status, WidgetPalette palette) {
+        int color = status.hasDisplay && status.displayOn
+                ? palette.primary
+                : palette.secondary;
         views.setTextColor(R.id.widget_display_state, color);
+    }
+
+    private static void styleStepButtons(RemoteViews views, WidgetPalette palette) {
+        views.setTextColor(R.id.widget_zone_up, palette.secondary);
+        views.setTextColor(R.id.widget_zone_down, palette.secondary);
+    }
+
+    private static void applyBackground(RemoteViews views, WidgetPalette palette) {
+        views.setInt(R.id.widget_root, "setBackgroundColor", palette.background);
+        views.setInt(R.id.widget_power_state, "setBackgroundColor", Color.TRANSPARENT);
+        views.setInt(R.id.widget_display_state, "setBackgroundColor", Color.TRANSPARENT);
+        views.setInt(R.id.widget_zone_up, "setBackgroundColor", Color.TRANSPARENT);
+        views.setInt(R.id.widget_zone_down, "setBackgroundColor", Color.TRANSPARENT);
     }
 
     private static PendingIntent broadcastIntent(Context context, String action) {
@@ -230,5 +264,48 @@ public class AcWidgetProvider extends AppWidgetProvider {
                 updateAllWidgets(context);
             }
         }, "BlueStarAcWidgetRefresh").start();
+    }
+
+    private static final class WidgetPalette {
+        final int primary;
+        final int secondary;
+        final int altMode;
+        final int background;
+
+        private WidgetPalette(int primary, int secondary, int altMode, int background) {
+            this.primary = primary;
+            this.secondary = secondary;
+            this.altMode = altMode;
+            this.background = background;
+        }
+
+        static WidgetPalette from(Context context, AcPrefs prefs) {
+            boolean dark = shouldUseDarkTheme(context, prefs.getWidgetTheme());
+            int opacity = prefs.getWidgetBackgroundOpacity();
+            int alpha = Math.round(255f * opacity / 100f);
+            if (dark) {
+                return new WidgetPalette(
+                        Color.rgb(243, 247, 252),
+                        Color.rgb(169, 180, 194),
+                        Color.rgb(255, 210, 122),
+                        Color.argb(alpha, 16, 20, 24));
+            }
+            return new WidgetPalette(
+                    Color.rgb(22, 32, 42),
+                    Color.rgb(95, 108, 123),
+                    Color.rgb(137, 85, 0),
+                    Color.argb(alpha, 255, 255, 255));
+        }
+
+        private static boolean shouldUseDarkTheme(Context context, String theme) {
+            if (AcPrefs.WIDGET_THEME_DARK.equals(theme)) {
+                return true;
+            }
+            if (AcPrefs.WIDGET_THEME_LIGHT.equals(theme)) {
+                return false;
+            }
+            int nightMode = context.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+            return nightMode == Configuration.UI_MODE_NIGHT_YES;
+        }
     }
 }

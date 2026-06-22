@@ -9,6 +9,8 @@ import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.NumberPicker;
+import android.widget.RadioGroup;
+import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 
@@ -24,8 +26,12 @@ public class MainActivity extends Activity {
     private NumberPicker tempPicker;
     private Switch displaySwitch;
     private Button powerButton;
+    private RadioGroup widgetThemeGroup;
+    private SeekBar widgetOpacitySlider;
+    private TextView widgetOpacityLabel;
     private boolean ignoreDisplayChange;
     private boolean ignoreTempChange;
+    private boolean ignoreWidgetSettingsChange;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,6 +47,9 @@ public class MainActivity extends Activity {
         tempPicker = findViewById(R.id.temp_picker);
         displaySwitch = findViewById(R.id.display_switch);
         powerButton = findViewById(R.id.power_button);
+        widgetThemeGroup = findViewById(R.id.widget_theme_group);
+        widgetOpacitySlider = findViewById(R.id.widget_opacity_slider);
+        widgetOpacityLabel = findViewById(R.id.widget_opacity_label);
         Button saveButton = findViewById(R.id.save_button);
         Button refreshButton = findViewById(R.id.refresh_button);
 
@@ -50,6 +59,7 @@ public class MainActivity extends Activity {
         tempPicker.setMinValue(AcStatus.MIN_TEMP);
         tempPicker.setMaxValue(AcStatus.MAX_TEMP);
         tempPicker.setWrapSelectorWheel(false);
+        renderWidgetSettings();
 
         saveButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -83,6 +93,30 @@ public class MainActivity extends Activity {
                 if (!ignoreTempChange) {
                     setTemperature(newValue);
                 }
+            }
+        });
+        widgetThemeGroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(RadioGroup group, int checkedId) {
+                if (!ignoreWidgetSettingsChange) {
+                    saveWidgetTheme(checkedId);
+                }
+            }
+        });
+        widgetOpacitySlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    saveWidgetOpacity(progress);
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
             }
         });
 
@@ -214,6 +248,43 @@ public class MainActivity extends Activity {
 
     private void setStatus(String message) {
         statusText.setText(message);
+    }
+
+    private void renderWidgetSettings() {
+        ignoreWidgetSettingsChange = true;
+        String theme = prefs.getWidgetTheme();
+        if (AcPrefs.WIDGET_THEME_LIGHT.equals(theme)) {
+            widgetThemeGroup.check(R.id.widget_theme_light);
+        } else if (AcPrefs.WIDGET_THEME_DARK.equals(theme)) {
+            widgetThemeGroup.check(R.id.widget_theme_dark);
+        } else {
+            widgetThemeGroup.check(R.id.widget_theme_system);
+        }
+        int opacity = prefs.getWidgetBackgroundOpacity();
+        widgetOpacitySlider.setProgress(opacity);
+        setWidgetOpacityLabel(opacity);
+        ignoreWidgetSettingsChange = false;
+    }
+
+    private void saveWidgetTheme(int checkedId) {
+        if (checkedId == R.id.widget_theme_light) {
+            prefs.saveWidgetTheme(AcPrefs.WIDGET_THEME_LIGHT);
+        } else if (checkedId == R.id.widget_theme_dark) {
+            prefs.saveWidgetTheme(AcPrefs.WIDGET_THEME_DARK);
+        } else {
+            prefs.saveWidgetTheme(AcPrefs.WIDGET_THEME_SYSTEM);
+        }
+        AcWidgetProvider.updateAllWidgets(this);
+    }
+
+    private void saveWidgetOpacity(int opacity) {
+        prefs.saveWidgetBackgroundOpacity(opacity);
+        setWidgetOpacityLabel(opacity);
+        AcWidgetProvider.updateAllWidgets(this);
+    }
+
+    private void setWidgetOpacityLabel(int opacity) {
+        widgetOpacityLabel.setText(String.format("Background opacity: %02d%%", opacity));
     }
 
     private interface StatusTask {

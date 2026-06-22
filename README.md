@@ -160,11 +160,11 @@ Only expose the service on a trusted private network. The local API currently ha
 
 The Android APK does not include Blue Star account credentials. Keep `BLUESTAR_AUTH_ID` and `BLUESTAR_PASSWORD` in the local Node service `.env`; the Android app only talks to that service over your LAN.
 
-The home-screen widget uses a minimal live-state control. When the AC is on in Cool mode it shows the set temperature and display state, for example `27` and `On`. Tap the center state to toggle AC power. Tap the upper/lower part of the state area to adjust temperature.
+The home-screen widget uses a minimal four-button layout: `AC On/Off` and `Display On/Off` on the left, with `▲`, temperature, and `▼` on the right. Tap `AC On/Off` to toggle AC power. Tap `Display On/Off` to toggle the display light. Tap `▲` or `▼` to adjust temperature.
 
-If the AC is on but not in Cool mode, the widget shows `Alt Mode` plus the display state. Tapping the center state turns the AC off. Tapping the upper/lower state area switches back to Cool mode and sets the temperature.
+If the AC is on but not in Cool mode, the widget shows `Alt Mode` plus the display state. Tapping `▲` or `▼` switches back to Cool mode and sets the temperature.
 
-Android home-screen widgets do not receive continuous drag gestures, so the widget mirrors press-and-swipe with invisible upper/lower tap zones. The right-side `On`/`Off` state toggles the display light. When the AC is off, the widget shows only `Off`.
+Android home-screen widgets do not receive continuous drag gestures, so the widget uses visible `▲` and `▼` tap zones instead of swipe. The Android app includes widget settings for System/Light/Dark theme and background opacity from `00%` to `100%`.
 
 The widget is intentionally light: automatic background status refreshes are rate-limited to once every 45 minutes, including after device boot. Tapping widget commands can still read status after the command completes so the displayed state stays accurate. If the widget is installed, Android will wake the widget receiver after boot; there is no always-running foreground service.
 
