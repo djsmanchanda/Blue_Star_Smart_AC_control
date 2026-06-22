@@ -104,6 +104,7 @@ npm link
 Then start the local service and run:
 
 ```powershell
+ac status
 ac on
 ac off
 ac display on
@@ -123,7 +124,7 @@ ac timer cancel on
 ac timer cancel off
 ```
 
-Temperature step commands such as `ac 1+`, `ac 1-`, `ac 3+`, and `ac 3-` read the current AC status, then adjust the set temperature by that many degrees. `ac set 27` sets the target temperature directly. `ac on 1h` schedules an on timer, `ac off 5m` schedules an off timer, and `ac timer ...` remains an off-timer shortcut. `ac timer cancel` cancels the off timer by default; pass `on` or `off` to cancel a specific timer. For Blue Star cloud devices this writes the AC-native `ontimer` or `offtimer` minutes field; other providers fall back to in-memory service timers that are cleared if the service is stopped or restarted.
+`ac status` prints the current AC settings, including power, temperatures, mode, fan, profile, display, swing, timers, timestamp, and raw reported state fields. Temperature step commands such as `ac 1+`, `ac 1-`, `ac 3+`, and `ac 3-` read the current AC status, then adjust the set temperature by that many degrees. `ac set 27` sets the target temperature directly. `ac on 1h` schedules an on timer, `ac off 5m` schedules an off timer, and `ac timer ...` remains an off-timer shortcut. `ac timer cancel` cancels the off timer by default; pass `on` or `off` to cancel a specific timer. For Blue Star cloud devices this writes the AC-native `ontimer` or `offtimer` minutes field; other providers fall back to in-memory service timers that are cleared if the service is stopped or restarted.
 
 ## Android App And Widget
 

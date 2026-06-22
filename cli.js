@@ -21,6 +21,7 @@ const deviceId = "ac";
 function usage() {
   return [
     "Usage:",
+    "  ac status",
     "  ac on",
     "  ac off",
     "  ac display on",
@@ -75,6 +76,71 @@ async function getCurrentTemperature() {
   const { status } = await api(`/api/devices/${encodeURIComponent(deviceId)}/status`);
   const temperature = Number(status?.state?.stemp);
   return Number.isFinite(temperature) ? temperature : fallback;
+}
+
+function valueOrUnknown(value) {
+  return value === undefined || value === null || value === "" ? "Unknown" : String(value);
+}
+
+function formatStatusTemperature(value) {
+  return value === undefined || value === null || value === "" ? "Unknown" : `${value} C`;
+}
+
+function formatAcTimestamp(value) {
+  const timestamp = Number(value);
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return "Unknown";
+  }
+  const milliseconds = timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp;
+  const date = new Date(milliseconds);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+  return `${date.toLocaleString()} (${date.toISOString().replace(".000Z", "Z")})`;
+}
+
+function formatReportedTimer(value) {
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return "Off";
+  }
+  return formatDuration(Math.ceil(minutes) * 60);
+}
+
+function printStatusLine(label, value) {
+  console.log(`${label.padEnd(18)} ${valueOrUnknown(value)}`);
+}
+
+function rawStateLine(state) {
+  const entries = Object.entries(state || {}).sort(([left], [right]) => left.localeCompare(right));
+  if (!entries.length) {
+    return "None";
+  }
+  return entries.map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(", ");
+}
+
+async function printStatus() {
+  const { device, status } = await api(`/api/devices/${encodeURIComponent(deviceId)}/status`);
+  const summary = status?.summary || {};
+  const state = status?.state || {};
+
+  console.log(`AC Status - ${device?.name || deviceId} (${device?.id || deviceId})`);
+  printStatusLine("Power", summary.power);
+  printStatusLine("Set temp", formatStatusTemperature(summary.temperatureCelsius));
+  printStatusLine("Room temp", formatStatusTemperature(summary.ambientTemperatureCelsius));
+  printStatusLine("Mode", summary.mode);
+  printStatusLine("Fan", summary.fanSpeed);
+  printStatusLine("Profile", summary.capacityProfile);
+  printStatusLine("Display", summary.display);
+  printStatusLine("Horizontal swing", summary.horizontalSwing);
+  printStatusLine("Vertical swing", summary.verticalSwing);
+  printStatusLine("On timer", formatReportedTimer(state.ontimer));
+  printStatusLine("Off timer", formatReportedTimer(state.offtimer));
+  printStatusLine("AC timestamp", formatAcTimestamp(state.ts));
+  printStatusLine("Provider", summary.provider || device?.provider);
+  console.log("");
+  console.log("Reported state");
+  console.log(rawStateLine(state));
 }
 
 function parseDuration(parts) {
@@ -155,6 +221,11 @@ function parseTemperature(value) {
 
 async function main() {
   const args = process.argv.slice(2).map((arg) => arg.toLowerCase());
+
+  if (args.length === 1 && args[0] === "status") {
+    await printStatus();
+    return;
+  }
 
   if (args.length > 1 && ["on", "off"].includes(args[0])) {
     await scheduleTimerKind(args[0], args.slice(1));
