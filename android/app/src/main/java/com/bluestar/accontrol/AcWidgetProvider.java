@@ -80,7 +80,7 @@ public class AcWidgetProvider extends AppWidgetProvider {
         }
 
         String error = prefs.getLastError();
-        if (error != null && error.length() > 0) {
+        if (!hasDisplayableState(status) && error != null && error.length() > 0) {
             views.setTextViewText(R.id.widget_main_state, "Error");
         } else {
             views.setTextViewText(R.id.widget_main_state, primaryStateText(status));
@@ -113,6 +113,10 @@ public class AcWidgetProvider extends AppWidgetProvider {
             return "Alt\nMode";
         }
         return String.valueOf(status.temperatureCelsius);
+    }
+
+    private static boolean hasDisplayableState(AcStatus status) {
+        return status.hasPower || status.hasTemperature || status.hasDisplay;
     }
 
     private static String powerStateText(AcStatus status) {
@@ -197,6 +201,7 @@ public class AcWidgetProvider extends AppWidgetProvider {
                     AcStatus cached = prefs.getLastStatus();
                     AcApiClient client = new AcApiClient(prefs.getBaseUrl(), prefs.getDeviceId());
 
+                    boolean shouldRefresh = true;
                     if (ACTION_TEMP_UP.equals(action) || ACTION_TEMP_DOWN.equals(action)) {
                         int delta = ACTION_TEMP_UP.equals(action) ? 1 : -1;
                         int nextTemp = AcStatus.clampTemperature(cached.temperatureCelsius + delta);
@@ -205,7 +210,7 @@ public class AcWidgetProvider extends AppWidgetProvider {
                             prefs.saveTemperature(nextTemp);
                             updateAllWidgets(context);
                             client.sendCommand("turnOn", null);
-                            client.sendCommand("setMode", 2);
+                            sendBestEffort(client, "setMode", 2);
                         } else {
                             prefs.saveTemperature(nextTemp);
                             updateAllWidgets(context);
@@ -216,24 +221,42 @@ public class AcWidgetProvider extends AppWidgetProvider {
                         prefs.savePower(nextPower);
                         updateAllWidgets(context);
                         client.sendCommand(nextPower ? "turnOn" : "turnOff", null);
-                        if (nextPower) {
-                            client.sendCommand("setMode", 2);
-                            prefs.saveCoolMode();
-                        }
                     } else if (ACTION_DISPLAY_TOGGLE.equals(action)) {
                         boolean nextDisplay = !cached.displayOn;
                         prefs.saveDisplay(nextDisplay);
                         updateAllWidgets(context);
                         client.sendCommand("setDisplay", nextDisplay ? 1 : 0);
+                    } else {
+                        shouldRefresh = false;
                     }
 
-                    prefs.saveStatus(client.fetchStatus());
+                    if (shouldRefresh) {
+                        refreshStatusBestEffort(client, prefs);
+                    }
                 } catch (Exception error) {
-                    prefs.saveError(error);
+                    if (!hasDisplayableState(prefs.getLastStatus())) {
+                        prefs.saveError(error);
+                    }
                 }
                 updateAllWidgets(context);
             }
         }, "BlueStarAcWidgetAction").start();
+    }
+
+    private static void sendBestEffort(AcApiClient client, String command, Object value) {
+        try {
+            client.sendCommand(command, value);
+        } catch (Exception ignored) {
+            // Follow-up commands can fail while the AC is waking; keep the primary command result visible.
+        }
+    }
+
+    private static void refreshStatusBestEffort(AcApiClient client, AcPrefs prefs) {
+        try {
+            prefs.saveStatus(client.fetchStatus());
+        } catch (Exception ignored) {
+            prefs.clearError();
+        }
     }
 
     private static void refreshIfDueAsync(final Context context) {

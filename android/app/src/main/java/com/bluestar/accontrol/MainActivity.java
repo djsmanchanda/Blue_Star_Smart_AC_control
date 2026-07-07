@@ -161,7 +161,7 @@ public class MainActivity extends Activity {
             @Override
             public AcStatus run(AcApiClient client) throws Exception {
                 client.sendCommand("setTemperature", temperatureCelsius);
-                return client.fetchStatus();
+                return fetchStatusOrCached(client);
             }
         });
     }
@@ -175,7 +175,7 @@ public class MainActivity extends Activity {
             @Override
             public AcStatus run(AcApiClient client) throws Exception {
                 client.sendCommand(nextPower ? "turnOn" : "turnOff", null);
-                return client.fetchStatus();
+                return fetchStatusOrCached(client);
             }
         });
     }
@@ -187,9 +187,17 @@ public class MainActivity extends Activity {
             @Override
             public AcStatus run(AcApiClient client) throws Exception {
                 client.sendCommand("setDisplay", displayOn ? 1 : 0);
-                return client.fetchStatus();
+                return fetchStatusOrCached(client);
             }
         });
+    }
+
+    private AcStatus fetchStatusOrCached(AcApiClient client) {
+        try {
+            return client.fetchStatus();
+        } catch (Exception ignored) {
+            return prefs.getLastStatus();
+        }
     }
 
     private void runStatusTask(final String loadingMessage, final StatusTask task) {

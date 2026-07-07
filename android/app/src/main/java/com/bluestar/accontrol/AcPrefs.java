@@ -95,6 +95,7 @@ final class AcPrefs {
         prefs.edit()
                 .putInt(KEY_LAST_TEMP, AcStatus.clampTemperature(temperatureCelsius))
                 .putBoolean(KEY_HAS_TEMP, true)
+                .remove(KEY_LAST_ERROR)
                 .apply();
     }
 
@@ -102,6 +103,7 @@ final class AcPrefs {
         prefs.edit()
                 .putBoolean(KEY_POWER_ON, powerOn)
                 .putBoolean(KEY_HAS_POWER, true)
+                .remove(KEY_LAST_ERROR)
                 .apply();
     }
 
@@ -109,6 +111,7 @@ final class AcPrefs {
         prefs.edit()
                 .putBoolean(KEY_DISPLAY_ON, displayOn)
                 .putBoolean(KEY_HAS_DISPLAY, true)
+                .remove(KEY_LAST_ERROR)
                 .apply();
     }
 
@@ -119,6 +122,13 @@ final class AcPrefs {
                 .putInt(KEY_MODE_VALUE, 2)
                 .putString(KEY_MODE_LABEL, "Cool")
                 .putBoolean(KEY_HAS_MODE, true)
+                .remove(KEY_LAST_ERROR)
+                .apply();
+    }
+
+    void clearError() {
+        prefs.edit()
+                .remove(KEY_LAST_ERROR)
                 .apply();
     }
 
