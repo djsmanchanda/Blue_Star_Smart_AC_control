@@ -533,17 +533,29 @@ $stateTimer.Start()
 
 # --- Show popup near tray ---
 
+function Refresh-PopupOnOpen {
+  if (-not $script:ServiceReady) {
+    if (Test-Service) {
+      $script:ServiceReady = $true
+      $notifyIcon.Text = "AC Control"
+      $stateTimer.Interval = 300000
+    } else {
+      return
+    }
+  }
+
+  Refresh-PopupVisualState
+}
+
 function Show-TrayPopup {
   $point = [System.Windows.Forms.Cursor]::Position
   $screen = [System.Windows.Forms.Screen]::FromPoint($point).WorkingArea
   $x = [Math]::Min($point.X, $screen.Right - $script:TrayPopup.Width - 8)
   $y = [Math]::Min($point.Y, $screen.Bottom - $script:TrayPopup.Height - 8)
   $script:TrayPopup.Location = New-Object System.Drawing.Point ([Math]::Max($screen.Left + 8, $x)), ([Math]::Max($screen.Top + 8, $y))
+  Refresh-PopupOnOpen
   $script:TrayPopup.Show()
   $script:TrayPopup.Activate()
-  if ($script:ServiceReady) {
-    Refresh-PopupVisualState
-  }
 }
 
 $notifyIcon.Add_MouseUp({

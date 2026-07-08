@@ -178,6 +178,8 @@ After setup, install the startup shortcut:
 
 At your next Windows sign-in, the tray app will start automatically. The tray starts the background service when needed.
 
+If the tray does not appear after sign-in, check `tray-startup.log` in this project folder. The startup launcher writes one line for each hidden launch attempt and records PowerShell errors that would otherwise be invisible.
+
 To remove startup behavior later, delete the shortcut that the setup script created in your Windows Startup folder.
 
 ## Configuration
