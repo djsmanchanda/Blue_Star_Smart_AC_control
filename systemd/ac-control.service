@@ -1,0 +1,13 @@
+[Unit]
+Description=Blue Star Smart AC local control service
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.local/share/ac-control
+ExecStart=/usr/bin/node %h/.local/share/ac-control/service.js
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
