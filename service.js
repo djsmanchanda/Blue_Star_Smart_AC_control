@@ -3,15 +3,14 @@ const http = require("node:http");
 const crypto = require("node:crypto");
 const net = require("node:net");
 const os = require("node:os");
-const path = require("node:path");
 const tls = require("node:tls");
 const { URL } = require("node:url");
+const paths = require("./paths");
 
 const root = __dirname;
-const configPath = path.join(root, "config.json");
-const fallbackConfigPath = path.join(root, "config.example.json");
-const logPath = path.join(root, "service.log");
-const envPath = path.join(root, ".env");
+const configPath = paths.configPath;
+const fallbackConfigPath = paths.fallbackConfigPath;
+const logPath = paths.logPath;
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -22,11 +21,10 @@ const mimeTypes = {
 };
 
 function loadEnvFile() {
-  if (!fs.existsSync(envPath)) {
-    return;
-  }
-  const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
-  for (const line of lines) {
+  for (const envPath of paths.envPaths) {
+    if (!fs.existsSync(envPath)) continue;
+    const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
+    for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) {
       continue;
@@ -45,6 +43,7 @@ function loadEnvFile() {
     }
     if (key && process.env[key] === undefined) {
       process.env[key] = value;
+    }
     }
   }
 }

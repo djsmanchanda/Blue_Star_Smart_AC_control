@@ -1,14 +1,10 @@
 #!/usr/bin/env node
 
 const fs = require("node:fs");
-const path = require("node:path");
-
-const root = __dirname;
-const configPath = path.join(root, "config.json");
-const fallbackConfigPath = path.join(root, "config.example.json");
+const paths = require("./paths");
 
 function loadConfig() {
-  const source = fs.existsSync(configPath) ? configPath : fallbackConfigPath;
+  const source = fs.existsSync(paths.configPath) ? paths.configPath : paths.fallbackConfigPath;
   return JSON.parse(fs.readFileSync(source, "utf8"));
 }
 
@@ -119,8 +115,12 @@ function rawStateLine(state) {
   return entries.map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(", ");
 }
 
-async function printStatus() {
+async function printStatus(asJson = false) {
   const { device, status } = await api(`/api/devices/${encodeURIComponent(deviceId)}/status`);
+  if (asJson) {
+    console.log(JSON.stringify({ device, status }));
+    return;
+  }
   const summary = status?.summary || {};
   const state = status?.state || {};
 
@@ -222,8 +222,8 @@ function parseTemperature(value) {
 async function main() {
   const args = process.argv.slice(2).map((arg) => arg.toLowerCase());
 
-  if (args.length === 1 && args[0] === "status") {
-    await printStatus();
+  if (args[0] === "status" && (args.length === 1 || (args.length === 2 && args[1] === "--json"))) {
+    await printStatus(args[1] === "--json");
     return;
   }
 

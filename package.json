@@ -2,7 +2,7 @@
   "name": "ac-control",
   "version": "0.1.0",
   "private": true,
-  "description": "Lightweight Windows tray service for Blue Star AC control.",
+  "description": "Cross-platform Blue Star AC service, CLI, and Omarchy tray plugin.",
   "license": "Apache-2.0",
   "main": "service.js",
   "bin": {
@@ -10,6 +10,7 @@
   },
   "scripts": {
     "start": "node service.js",
-    "tray": "powershell -ExecutionPolicy Bypass -File .\\tray.ps1"
+    "tray": "powershell -ExecutionPolicy Bypass -File .\\tray.ps1",
+    "check": "node --check cli.js && node --check service.js && node --check paths.js"
   }
 }
