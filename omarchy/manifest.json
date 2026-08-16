@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "blue-star-ac",
+  "name": "Blue Star AC",
+  "version": "1.0.0",
+  "author": "Blue Star Smart AC Control",
+  "description": "Control a Blue Star Smart AC from the Omarchy bar",
+  "kinds": ["bar-widget"],
+  "entryPoints": { "barWidget": "Panel.qml" },
+  "barWidget": {
+    "displayName": "Blue Star AC",
+    "description": "Power, temperature, display, and status controls",
+    "category": "Home",
+    "allowMultiple": false
+  }
+}
