@@ -1,10 +1,11 @@
 # Blue Star Smart AC Control
 
-A lightweight Windows tray app and local web panel for controlling a Blue Star Smart AC from your laptop.
+A cross-platform local service and control panel for controlling a Blue Star Smart AC from your laptop.
 
 It runs a small Node.js service on `127.0.0.1:8765`, talks to your configured AC provider, and gives you several local control surfaces:
 
 - a Windows system tray menu for quick changes
+- a Linux CLI and Omarchy status-bar plugin
 - a browser panel at `http://127.0.0.1:8765/`
 - a command line shortcut for common controls
 - an optional Android app and home-screen widget under `android/`
@@ -30,8 +31,7 @@ The web panel does not continuously poll AC status in the background. It reads A
 
 ## Requirements
 
-- Windows 10 or Windows 11
-- Node.js 18 or newer
+- Windows 10/11, or Linux with Node.js 18 or newer
 - A Blue Star Smart AC account or a configured mock/local provider
 - Local access to this project folder
 
@@ -77,6 +77,43 @@ The web panel does not continuously poll AC status in the background. It reads A
    ```powershell
    npm run tray
    ```
+
+## Linux And Omarchy
+
+The Windows tray and Android app remain available. On Linux, the same Node.js
+service is managed as a user systemd unit and the `ac` command is available
+from `~/.local/bin`.
+
+Install the Linux integration from an Omarchy terminal:
+
+```bash
+./install-linux.sh
+```
+
+The installer copies the service to `~/.local/share/ac-control`, installs the
+configuration under `~/.config/ac-control`, enables `ac-control.service`, and
+installs the Omarchy plugin under `~/.config/omarchy/plugins/blue-star-ac`.
+Add the widget to the bar by adding `{ "id": "blue-star-ac" }` to a layout
+section in `~/.config/omarchy/shell.json`; the shell hot-reloads the plugin.
+
+Linux CLI examples:
+
+```bash
+ac status
+ac status --json
+ac on
+ac off
+ac 1+
+ac set 27
+ac timer 1h
+```
+
+Linux uses XDG paths by default. Put credentials in
+`~/.config/ac-control/.env` and edit `~/.config/ac-control/config.json`.
+Override paths with `AC_CONTROL_CONFIG`, `AC_CONTROL_CONFIG_DIR`, or
+`AC_CONTROL_STATE_DIR` when packaging or running multiple installations.
+Inspect the service with `systemctl --user status ac-control.service` and its
+logs with `journalctl --user -u ac-control.service`.
 
 ## Using The Tray
 
