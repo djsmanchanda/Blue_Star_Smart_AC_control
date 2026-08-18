@@ -39,7 +39,7 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: "AC"
+    text: "❄"
     slotSize: Style.bar.iconSlot
     tooltipText: root.statusText()
     onPressed: function(b) { root.toggle() }
