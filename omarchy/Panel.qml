@@ -9,8 +9,11 @@ Panel {
   id: root
   moduleName: "blue-star-ac"
   ipcTarget: "blue-star-ac"
+  manageIpc: false
   property var ac: ({})
   property string message: ""
+  implicitWidth: button.implicitWidth
+  implicitHeight: button.implicitHeight
 
   function refresh() { if (!statusProc.running) statusProc.running = true }
   function run(args) { actionProc.command = ["ac"].concat(args); actionProc.running = true; refresh() }
@@ -36,7 +39,8 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.ac.status && root.ac.status.summary && root.ac.status.summary.power === "On" ? "󰆴" : "󰆳"
+    text: "AC"
+    slotSize: Style.bar.iconSlot
     tooltipText: root.statusText()
     onPressed: function(b) { root.toggle() }
   }
