@@ -12,7 +12,8 @@ Panel {
   manageIpc: false
   property var ac: ({})
   property string message: ""
-  readonly property bool acIsOn: ac.status && ac.status.summary && ac.status.summary.power === "On"
+  property string powerState: ""
+  readonly property bool acIsOn: powerState === "On"
   readonly property color acColor: acIsOn
     ? "#ffffff"
     : "#6b7280"
@@ -107,7 +108,13 @@ Panel {
     id: statusProc
     command: ["ac", "status", "--json"]
     stdout: StdioCollector { waitForEnd: true; onStreamFinished: {
-      try { root.ac = JSON.parse(text); root.message = "" }
+      try {
+        var parsed = JSON.parse(text)
+        root.ac = parsed
+        root.powerState = parsed.status && parsed.status.summary
+          ? String(parsed.status.summary.power || "") : ""
+        root.message = ""
+      }
       catch (error) { root.message = "Run: ac status" }
     } }
   }
