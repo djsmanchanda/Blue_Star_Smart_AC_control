@@ -12,6 +12,10 @@ Panel {
   manageIpc: false
   property var ac: ({})
   property string message: ""
+  readonly property bool acIsOn: ac.status && ac.status.summary && ac.status.summary.power === "On"
+  readonly property color acColor: acIsOn
+    ? "#ffffff"
+    : "#6b7280"
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
@@ -41,6 +45,8 @@ Panel {
     bar: root.bar
     text: "❄"
     slotSize: Style.bar.iconSlot
+    foreground: root.acColor
+    useActiveColor: false
     tooltipText: root.statusText()
     onPressed: function(b) { root.toggle() }
   }
@@ -106,7 +112,8 @@ Panel {
     } }
   }
 
-  Process { id: actionProc; onExited: root.refresh() }
-  Timer { interval: 30000; running: root.opened; repeat: true; onTriggered: root.refresh() }
+  Process { id: actionProc; onExited: refreshAfterAction.restart() }
+  Timer { id: refreshAfterAction; interval: 750; repeat: false; onTriggered: root.refresh() }
+  Timer { interval: 600000; running: true; repeat: true; onTriggered: root.refresh() }
   Component.onCompleted: root.refresh()
 }
