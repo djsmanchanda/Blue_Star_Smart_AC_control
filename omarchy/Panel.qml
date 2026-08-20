@@ -14,9 +14,6 @@ Panel {
   property string message: ""
   property string powerState: ""
   readonly property bool acIsOn: powerState === "On"
-  readonly property color acColor: acIsOn
-    ? "#ffffff"
-    : "#6b7280"
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
@@ -46,7 +43,9 @@ Panel {
     bar: root.bar
     text: "❄"
     slotSize: Style.bar.iconSlot
-    foreground: root.acColor
+    active: root.acIsOn
+    dimmed: !root.acIsOn
+    foreground: root.bar.foreground
     useActiveColor: false
     tooltipText: root.statusText()
     onPressed: function(b) { root.toggle() }
