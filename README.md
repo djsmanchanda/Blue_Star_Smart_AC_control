@@ -10,9 +10,15 @@ It runs a small Node.js service on `127.0.0.1:8765`, talks to your configured AC
 - a command line shortcut for common controls
 - an optional Android app and home-screen widget under `android/`
 
-![Windows tray menu](assets/tray-menu.png)
+## Control Surfaces
 
-![Local web control panel](assets/web-panel.png)
+### Windows tray plugin
+
+![Windows tray plugin](assets/windows-tray-plugin.png)
+
+### Localhost dashboard
+
+![Localhost dashboard](assets/localhost-dashboard.png)
 
 ## What You Can Control
 
@@ -124,7 +130,9 @@ required for the full Linux integration.
 The repository root contains the marketplace manifest at `manifest.json`.
 The namespaced Omarchy entry point is `djsmanchanda.blue-star-ac`.
 
-![Blue Star AC Omarchy panel](assets/omarchy-blue-star-ac-panel.png)
+### Blue Star AC Omarchy panel
+
+![Blue Star AC Omarchy panel](assets/omarchy-plugin-panel.png)
 
 Validate a checked-out repository with:
 
