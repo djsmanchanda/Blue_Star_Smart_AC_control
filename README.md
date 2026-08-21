@@ -123,6 +123,9 @@ required for the full Linux integration.
 
 The repository root contains the marketplace manifest at `manifest.json`.
 The namespaced Omarchy entry point is `djsmanchanda.blue-star-ac`.
+
+![Blue Star AC Omarchy panel](assets/omarchy-blue-star-ac-panel.png)
+
 Validate a checked-out repository with:
 
 ```bash
