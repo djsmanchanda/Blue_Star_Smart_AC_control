@@ -16,7 +16,7 @@ rsync -a \
   --exclude='android/**/build/' \
   "$repo_dir"/ "$install_dir"/
 (cd "$install_dir" && npm install --omit=dev)
-cp -a "$repo_dir/omarchy"/. "$plugin_dir"/
+cp "$repo_dir/manifest.json" "$repo_dir/BarWidget.qml" "$repo_dir/Panel.qml" "$plugin_dir/"
 sed "s|%h/.local/share/ac-control|$install_dir|g" "$repo_dir/systemd/ac-control.service" > "$unit_dir/ac-control.service"
 
 if [[ ! -f "$install_dir/config.json" ]]; then

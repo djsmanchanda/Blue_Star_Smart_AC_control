@@ -138,7 +138,7 @@ Validate a checked-out repository with:
 
 ```bash
 omarchy plugin validate .
-qmllint -I "$OMARCHY_PATH/shell" omarchy/BarWidget.qml omarchy/Panel.qml
+qmllint -I "$OMARCHY_PATH/shell" BarWidget.qml Panel.qml
 ```
 
 The plugin runs inside the existing Omarchy shell and calls the user-installed

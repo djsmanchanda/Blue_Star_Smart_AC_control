@@ -7,7 +7,7 @@
   "description": "Control a Blue Star Smart AC from the Omarchy bar.",
   "kinds": ["bar-widget"],
   "entryPoints": {
-    "barWidget": "omarchy/BarWidget.qml"
+    "barWidget": "BarWidget.qml"
   },
   "barWidget": {
     "displayName": "Blue Star AC",
