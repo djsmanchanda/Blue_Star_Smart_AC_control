@@ -4,9 +4,11 @@
   "name": "Blue Star AC",
   "version": "1.1.0",
   "author": "DJS Manchanda",
-  "description": "Control a Blue Star Smart AC from the Omarchy bar",
+  "description": "Control a Blue Star Smart AC from the Omarchy bar.",
   "kinds": ["bar-widget"],
-  "entryPoints": { "barWidget": "BarWidget.qml" },
+  "entryPoints": {
+    "barWidget": "omarchy/BarWidget.qml"
+  },
   "barWidget": {
     "displayName": "Blue Star AC",
     "description": "Power, temperature, display, and status controls",

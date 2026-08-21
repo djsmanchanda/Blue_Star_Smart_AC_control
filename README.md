@@ -92,8 +92,8 @@ Install the Linux integration from an Omarchy terminal:
 
 The installer copies the service to `~/.local/share/ac-control`, installs the
 configuration under `~/.config/ac-control`, enables `ac-control.service`, and
-installs the Omarchy plugin under `~/.config/omarchy/plugins/blue-star-ac`.
-Add the widget to the bar by adding `{ "id": "blue-star-ac" }` to a layout
+installs the Omarchy plugin under `~/.config/omarchy/plugins/djsmanchanda.blue-star-ac`.
+Add the widget to the bar by adding `{ "id": "djsmanchanda.blue-star-ac" }` to a layout
 section in `~/.config/omarchy/shell.json`; the shell hot-reloads the plugin.
 
 Linux CLI examples:
@@ -114,6 +114,28 @@ Override paths with `AC_CONTROL_CONFIG`, `AC_CONTROL_CONFIG_DIR`, or
 `AC_CONTROL_STATE_DIR` when packaging or running multiple installations.
 Inspect the service with `systemctl --user status ac-control.service` and its
 logs with `journalctl --user -u ac-control.service`.
+
+The Linux installer uses `rsync` to copy the runtime without repository Git
+metadata. Node.js 18+, `rsync`, `systemd --user`, and an Omarchy shell are
+required for the full Linux integration.
+
+### Community plugin publishing
+
+The repository root contains the marketplace manifest at `manifest.json`.
+The namespaced Omarchy entry point is `djsmanchanda.blue-star-ac`.
+Validate a checked-out repository with:
+
+```bash
+omarchy plugin validate .
+qmllint -I "$OMARCHY_PATH/shell" omarchy/BarWidget.qml omarchy/Panel.qml
+```
+
+The plugin runs inside the existing Omarchy shell and calls the user-installed
+`ac` CLI. It does not start Quickshell, use elevated privileges, or make network
+requests itself. The Node service performs the configured Blue Star cloud calls.
+Installation uses a user systemd service and user-owned XDG directories; no
+`sudo` is required. Remove it with `./uninstall-linux.sh`, which preserves your
+configuration and credentials in `~/.config/ac-control`.
 
 ## Using The Tray
 

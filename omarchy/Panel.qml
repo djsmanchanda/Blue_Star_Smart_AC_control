@@ -7,8 +7,8 @@ import qs.Ui
 
 Panel {
   id: root
-  moduleName: "blue-star-ac"
-  ipcTarget: "blue-star-ac"
+  moduleName: "djsmanchanda.blue-star-ac"
+  ipcTarget: "djsmanchanda.blue-star-ac"
   manageIpc: false
   property var ac: ({})
   property string message: ""
@@ -26,7 +26,7 @@ Panel {
   }
 
   IpcHandler {
-    target: "blue-star-ac"
+    target: "djsmanchanda.blue-star-ac"
     function refresh(): void { root.refresh() }
     function on(): void { root.run(["on"]) }
     function off(): void { root.run(["off"]) }
